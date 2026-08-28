@@ -3,7 +3,6 @@ backend/.venv/
 __pycache__/
 *.pyc
 .DS_Store
-.claude/
 
 # datos (pesados — se descargan con backend/data/demo/download_demos.sh o dvc pull)
 backend/data/demo/*.edf
