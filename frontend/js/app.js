@@ -50,13 +50,14 @@
   themeButtons().forEach(b => b.onclick = () =>
     applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
 
-  /* contador animado para los KPI numéricos */
-  function countUp(el, to) {
-    if (reducedMotion || !(to > 0)) { el.textContent = to; return; }
-    const t0 = performance.now(), dur = 500;
+  /* contador animado para los KPI numéricos (enteros y decimales) */
+  function countUp(el, to, decimals = 0) {
+    const fmt = v => decimals ? nf(v, decimals) : String(Math.round(v));
+    if (reducedMotion || !(to > 0)) { el.textContent = fmt(to); return; }
+    const t0 = performance.now(), dur = 520;
     const step = now => {
       const p = Math.min(1, (now - t0) / dur);
-      el.textContent = Math.round(to * (p * (2 - p))); // ease-out
+      el.textContent = fmt(to * (p * (2 - p))); // ease-out
       if (p < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
@@ -87,7 +88,7 @@
     countUp($("tOver"), records.filter(r => Math.abs(r.bai) > CFG.thresholdYears).length);
     if (n) {
       const bais = records.map(r => r.bai);
-      $("tMed").textContent = nf(median(bais.map(Math.abs)));
+      countUp($("tMed"), median(bais.map(Math.abs)), 1);
       $("tMedN").textContent = `años · rango ${sg(Math.min(...bais))} a ${sg(Math.max(...bais))}`;
       const last = [...records].sort((a, b) => parseAt(b.analyzed_at) - parseAt(a.analyzed_at))[0];
       const at = parseAt(last.analyzed_at), now = new Date(), yest = new Date(now - 864e5);
@@ -107,8 +108,10 @@
         || r.subject_code.toLowerCase().includes(query)
         || r.file_name.toLowerCase().includes(query));
     $("cnt").textContent = `${rows.length} registro${rows.length === 1 ? "" : "s"}`;
-    $("tb").replaceChildren(...rows.map(r => {
+    $("tb").replaceChildren(...rows.map((r, i) => {
       const tr = document.createElement("tr");
+      tr.className = "anim";
+      tr.style.setProperty("--i", Math.min(i, 12)); // entrada escalonada, tope de 12
       const pos = r.bai > 0, over = Math.abs(r.bai) > TH;
       tr.innerHTML = `<td class="l"><b>${r.subject_code}</b></td>
         <td class="l" style="color:var(--muted);font-size:12px">${r.file_name}</td>

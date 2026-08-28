@@ -272,6 +272,28 @@ body,header,.panel,.tile,.card,.mbox,.filerow,.drop,.chipset button,nav button,.
   .modal{animation:fadeIn .18s ease}
   .mbox{animation:popIn .24s cubic-bezier(.2,.9,.3,1.15)}
   .big .v,.bai{animation:viewIn .45s ease .1s both}
+
+  /* ── vista Registros ── */
+  .tiles .tile{animation:viewIn .35s ease both}
+  .tiles .tile:nth-child(1){animation-delay:.03s}
+  .tiles .tile:nth-child(2){animation-delay:.09s}
+  .tiles .tile:nth-child(3){animation-delay:.15s}
+  .tiles .tile:nth-child(4){animation-delay:.21s}
+  @keyframes rowIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+  tbody tr.anim{animation:rowIn .3s ease both;animation-delay:calc(var(--i,0)*35ms)}
+  tbody tr .act{transition:transform .18s ease,border-color .18s ease,color .18s ease}
+  tbody tr:hover .act:not(.del){transform:translateX(3px)}
+  tbody tr:hover .act.del{transform:rotate(-8deg)}
+  @keyframes dotIn{from{opacity:0;transform:scale(0)}to{opacity:1;transform:none}}
+  #c-strip circle{transform-origin:center;transform-box:fill-box;
+    animation:dotIn .45s cubic-bezier(.2,.9,.3,1.35) both;
+    animation-delay:calc(var(--i,0)*45ms + .12s)}
+  #c-strip rect,#c-strip line,#c-strip text{animation:fadeIn .5s ease both}
+  .search{transition:width .25s ease,border-color .2s ease,background-color .25s ease}
+  .search:focus{width:250px;border-color:var(--s1)}
+  .chipset button{transition:background-color .18s ease,color .18s ease}
+  .pill{transition:transform .15s ease}
+  tbody tr:hover .pill{transform:scale(1.05)}
 }
 </style>
 </head>
@@ -563,10 +585,10 @@ body,header,.panel,.tile,.card,.mbox,.filerow,.drop,.chipset button,nav button,.
 </div>
 
 <!-- ?v=N evita que el navegador use JS viejo en caché tras una actualización -->
-<script src="js/config.js?v=5"></script>
-<script src="js/charts.js?v=5"></script>
-<script src="js/mock.js?v=5"></script>
-<script src="js/api.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/config.js?v=6"></script>
+<script src="js/charts.js?v=6"></script>
+<script src="js/mock.js?v=6"></script>
+<script src="js/api.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>

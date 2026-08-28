@@ -57,11 +57,12 @@
         "stroke-width": t === 0 ? 1.5 : 1, "stroke-dasharray": t === 0 ? "none" : "3 3" }));
       s.appendChild(T({ x: x(t), y: 78, "text-anchor": "middle", "class": "tick" }, t === 0 ? "0" : sg(t, 0)));
     });
-    records.forEach(r => {
+    records.forEach((r, i) => {
       const over = Math.abs(r.bai) > TH, pos = r.bai > 0;
       s.appendChild(S("circle", { cx: x(r.bai), cy: 46, r: over ? 6 : 5,
         fill: CV(over ? (pos ? "--older" : "--younger") : "--muted"),
-        "fill-opacity": over ? 1 : .5, stroke: CV("--surface-1"), "stroke-width": 2 }));
+        "fill-opacity": over ? 1 : .5, stroke: CV("--surface-1"), "stroke-width": 2,
+        style: `--i:${Math.min(i, 18)}` })); // entrada escalonada de los puntos
     });
     s.appendChild(T({ x: L, y: 20, "class": "axlbl" }, "más joven de lo esperado"));
     s.appendChild(T({ x: W - R, y: 20, "text-anchor": "end", "class": "axlbl" }, "mayor de lo esperado"));
