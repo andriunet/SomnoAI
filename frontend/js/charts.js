@@ -34,6 +34,34 @@
 
   window.MaiaUtil = { nf, sg, clockHM, clockHMS, fmtHM, fmtInt, median };
 
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+  /* ── tooltip flotante compartido (datos precisos al pasar el mouse) ── */
+  const Tip = (() => {
+    let el = null;
+    const ensure = () => el || (el = Object.assign(
+      document.body.appendChild(document.createElement("div")), { className: "tipbox" }));
+    return {
+      show(html, ev) {
+        const t = ensure();
+        t.innerHTML = html;
+        let x = ev.clientX + 14, y = ev.clientY + 14;
+        if (x + 290 > innerWidth) x = ev.clientX - 296;
+        if (y + 100 > innerHeight) y = ev.clientY - 92;
+        t.style.left = x + "px";
+        t.style.top = y + "px";
+        t.classList.add("on");
+      },
+      hide() { el && el.classList.remove("on"); }
+    };
+  })();
+
+  /* convierte coordenadas del mouse al sistema del viewBox del SVG */
+  const svgX = (svgEl, ev, vbWidth) => {
+    const r = svgEl.getBoundingClientRect();
+    return (ev.clientX - r.left) * (vbWidth / r.width);
+  };
+
   /* Estadios: rampa ordinal de azules (claro = superficial); REM en otro tono */
   const STG = [
     { k: "W",   c: "#86b6ef" },
@@ -59,10 +87,18 @@
     });
     records.forEach((r, i) => {
       const over = Math.abs(r.bai) > TH, pos = r.bai > 0;
-      s.appendChild(S("circle", { cx: x(r.bai), cy: 46, r: over ? 6 : 5,
+      const c = S("circle", { cx: x(r.bai), cy: 46, r: over ? 6 : 5,
         fill: CV(over ? (pos ? "--older" : "--younger") : "--muted"),
         "fill-opacity": over ? 1 : .5, stroke: CV("--surface-1"), "stroke-width": 2,
-        style: `--i:${Math.min(i, 18)}` })); // entrada escalonada de los puntos
+        style: `--i:${Math.min(i, 18)}` }); // entrada escalonada de los puntos
+      const dt = new Date(r.analyzed_at);
+      c.addEventListener("mousemove", ev => Tip.show(
+        `<span class="tt">${r.subject_code} · ${r.file_name}</span>` +
+        `Edad ${r.chronological_age} → cerebral <b>${nf(r.brain_age)}</b> años<br>` +
+        `BAI <b>${sg(r.bai)}</b> · ${over ? "Priorizar" : "En rango"} · ` +
+        `${dt.getDate()} ${MESES[dt.getMonth()]}`, ev));
+      c.addEventListener("mouseleave", Tip.hide);
+      s.appendChild(c);
     });
     s.appendChild(T({ x: L, y: 20, "class": "axlbl" }, "más joven de lo esperado"));
     s.appendChild(T({ x: W - R, y: 20, "text-anchor": "end", "class": "axlbl" }, "mayor de lo esperado"));
@@ -88,7 +124,13 @@
     });
     s.appendChild(S("rect", { x: x(bai - err), y: 23, width: Math.max(x(bai + err) - x(bai - err), 4), height: 20, rx: 10,
       fill: CV(col), "fill-opacity": .24, stroke: CV(col), "stroke-width": 1.2 }));
-    s.appendChild(S("circle", { cx: x(bai), cy: 33, r: 8, fill: CV(col), stroke: CV("--surface-1"), "stroke-width": 2.5 }));
+    const dot = S("circle", { cx: x(bai), cy: 33, r: 8, fill: CV(col), stroke: CV("--surface-1"), "stroke-width": 2.5 });
+    dot.addEventListener("mousemove", ev => Tip.show(
+      `<span class="tt">BAI ${sg(bai)} años</span>` +
+      `Edad cerebral <b>${nf(d.brain_age)}</b> · cronológica ${d.chronological_age}<br>` +
+      `Intervalo del ${Math.round(d.interval.level * 100)}%: ${nf(d.interval.low)} – ${nf(d.interval.high)} años`, ev));
+    dot.addEventListener("mouseleave", Tip.hide);
+    s.appendChild(dot);
     s.appendChild(S("line", { x1: x(0), x2: x(0), y1: 19, y2: 47, stroke: CV("--ink2"), "stroke-width": 1.5 }));
     s.appendChild(T({ x: x(0), y: 14, "text-anchor": "middle", "class": "dlbl" }, "sin desvío"));
     [[-20, "20 años más joven"], [20, "20 años mayor"]].forEach(([v, t]) =>
@@ -155,6 +197,33 @@
       "Frecuencia (Hz) · ondas lentas ← → ondas rápidas"));
     s.appendChild(T({ x: L - 44, y: Tp + ph / 2, "class": "axlbl", transform: `rotate(-90 ${L - 44} ${Tp + ph / 2})`,
       "text-anchor": "middle" }, "Potencia (µV²/Hz)"));
+
+    // crosshair interactivo: frecuencia y potencias exactas bajo el cursor
+    const xh = S("g", { "class": "xhair", opacity: 0 });
+    const vln = S("line", { y1: Tp, y2: Tp + ph, stroke: CV("--axis"), "stroke-dasharray": "3 3" });
+    const cS = S("circle", { r: 4.5, fill: CV("--s1"), stroke: CV("--surface-1"), "stroke-width": 1.5 });
+    const cN = S("circle", { r: 3.5, fill: CV("--muted"), stroke: CV("--surface-1"), "stroke-width": 1.5 });
+    xh.append(vln, cS, cN);
+    s.appendChild(xh);
+    const fmtP = v => v >= 10 ? nf(v, 1) : nf(v, 2);
+    const capt = S("rect", { x: L, y: Tp, width: pw, height: ph, fill: "transparent", "class": "capt" });
+    capt.addEventListener("mousemove", ev => {
+      const fx = svgX(s, ev, W);
+      const f = Math.max(fmin, Math.min(fmax, fmin + ((fx - L) / pw) * (fmax - fmin)));
+      const i = Math.max(0, Math.min(sp.freqs.length - 1,
+        Math.round((f - sp.freqs[0]) / (sp.freqs[1] - sp.freqs[0]))));
+      const X = x(sp.freqs[i]);
+      vln.setAttribute("x1", X); vln.setAttribute("x2", X);
+      cS.setAttribute("cx", X); cS.setAttribute("cy", y(sp.subject[i]));
+      cN.setAttribute("cx", X); cN.setAttribute("cy", y(sp.norm[i]));
+      xh.setAttribute("opacity", 1);
+      const inBand = sp.freqs[i] >= b0 && sp.freqs[i] <= b1;
+      Tip.show(`<span class="tt">${nf(sp.freqs[i], 1)} Hz${inBand ? " · banda de husos" : ""}</span>` +
+        `Este sujeto: <b>${fmtP(sp.subject[i])}</b> µV²/Hz<br>` +
+        `Norma a su edad: ${fmtP(sp.norm[i])} µV²/Hz`, ev);
+    });
+    capt.addEventListener("mouseleave", () => { xh.setAttribute("opacity", 0); Tip.hide(); });
+    s.appendChild(capt);
     el.replaceChildren(s);
   }
 
@@ -170,7 +239,13 @@
     let cx = L;
     segs.forEach(seg => {
       const w = (seg.hours / tot) * pw, c = kindCol[seg.kind] || "--surface-3", inv = kindInv[seg.kind] || 0;
-      s.appendChild(S("rect", { x: cx, y: 26, width: Math.max(w - 2, 1), height: 32, rx: 5, fill: CV(c) }));
+      const rect = S("rect", { x: cx, y: 26, width: Math.max(w - 2, 1), height: 32, rx: 5, fill: CV(c),
+        "class": "qseg" });
+      rect.addEventListener("mousemove", ev => Tip.show(
+        `<span class="tt">${seg.label}</span>` +
+        `<b>${fmtHM(seg.hours * 3600)}</b> · ${nf(100 * seg.hours / tot, 1)} % del archivo`, ev));
+      rect.addEventListener("mouseleave", Tip.hide);
+      s.appendChild(rect);
       if (w > 110) {
         s.appendChild(T({ x: cx + w / 2, y: 40, "text-anchor": "middle", "font-size": "11.5", "font-weight": "600",
           fill: inv ? "#fff" : CV("--ink2") }, seg.label));
@@ -302,6 +377,27 @@
       s.appendChild(T({ x: L, y: H - 8, "class": "axlbl" },
         this.win <= 120 ? "Escala de detalle: se distingue la forma de onda época a época"
                         : "Trazo dibujado como envolvente mín-máx · reduzca la ventana para ver la onda"));
+
+      // crosshair: hora exacta, estadio y amplitud bajo el cursor
+      const xh = S("g", { "class": "xhair", opacity: 0 });
+      const vln = S("line", { y1: Tp, y2: Tp + ph, stroke: CV("--ink2"), "stroke-dasharray": "3 3" });
+      xh.appendChild(vln);
+      s.appendChild(xh);
+      const fmtClock = this.win <= 120 ? clockHMS : clockHM;
+      const capt = S("rect", { x: L, y: Tp, width: pw, height: ph + TRK + 8, fill: "transparent", "class": "capt" });
+      capt.addEventListener("mousemove", ev => {
+        const fx = svgX(s, ev, W);
+        const frac = Math.max(0, Math.min(1, (fx - L) / pw));
+        const t = t0 + frac * this.win;
+        const i = Math.max(0, Math.min(n - 1, Math.floor(frac * n)));
+        const X = L + frac * pw;
+        vln.setAttribute("x1", X); vln.setAttribute("x2", X);
+        xh.setAttribute("opacity", 1);
+        Tip.show(`<span class="tt">${fmtClock(T0 + t)} · ${STG[this.stageAt(t)].k}</span>` +
+          `Amplitud: <b>${nf(env.min[i], 0)}</b> a <b>${nf(env.max[i], 0)}</b> µV`, ev);
+      });
+      capt.addEventListener("mouseleave", () => { xh.setAttribute("opacity", 0); Tip.hide(); });
+      s.appendChild(capt);
       document.getElementById("c-signal").replaceChildren(s);
 
       // navegador de la noche (desde el hipnograma, sin pedir señal)

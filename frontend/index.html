@@ -294,7 +294,28 @@ body,header,.panel,.tile,.card,.mbox,.filerow,.drop,.chipset button,nav button,.
   .chipset button{transition:background-color .18s ease,color .18s ease}
   .pill{transition:transform .15s ease}
   tbody tr:hover .pill{transform:scale(1.05)}
+
+  /* ── datos precisos al pasar el mouse ── */
+  #c-strip circle{transition:r .18s ease,fill-opacity .18s ease,stroke-width .18s ease}
+  #c-strip circle:hover{r:9;fill-opacity:1;stroke-width:2.5}
+  #c-scale circle{transition:r .18s ease}
+  #c-scale circle:hover{r:10}
+  .qseg{transition:filter .15s ease}
+  .qseg:hover{filter:brightness(1.07)}
 }
+/* tooltip flotante (fuera del bloque de motion: siempre disponible) */
+.tipbox{position:fixed;z-index:80;pointer-events:none;background:var(--surface-1);
+  border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:12px;
+  line-height:1.55;color:var(--ink2);box-shadow:0 8px 28px rgba(0,0,0,.16);
+  max-width:280px;font-variant-numeric:tabular-nums;
+  opacity:0;transform:translateY(5px) scale(.97);
+  transition:opacity .14s ease,transform .14s ease}
+.tipbox.on{opacity:1;transform:none}
+.tipbox b{color:var(--ink)}
+.tipbox .tt{display:block;font-weight:650;color:var(--ink);margin-bottom:2px}
+#c-strip circle,#c-scale circle,.qseg{cursor:pointer}
+.capt{cursor:crosshair}
+.xhair{pointer-events:none;transition:opacity .15s ease}
 </style>
 </head>
 <body>
@@ -585,10 +606,10 @@ body,header,.panel,.tile,.card,.mbox,.filerow,.drop,.chipset button,nav button,.
 </div>
 
 <!-- ?v=N evita que el navegador use JS viejo en caché tras una actualización -->
-<script src="js/config.js?v=6"></script>
-<script src="js/charts.js?v=6"></script>
-<script src="js/mock.js?v=6"></script>
-<script src="js/api.js?v=6"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/config.js?v=7"></script>
+<script src="js/charts.js?v=7"></script>
+<script src="js/mock.js?v=7"></script>
+<script src="js/api.js?v=7"></script>
+<script src="js/app.js?v=7"></script>
 </body>
 </html>
