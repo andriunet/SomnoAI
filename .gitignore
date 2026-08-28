@@ -1,0 +1,19 @@
+# entornos y caches
+backend/.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
+
+# datos (pesados — se descargan con backend/data/demo/download_demos.sh o dvc pull)
+backend/data/demo/*.edf
+backend/data/dataset/
+backend/data/store/
+
+# salidas generadas (se regeneran con ml/build_features.py y ml/train.py)
+ml/out/
+ml/mlserver/
+
+# temporales
+*.part
+frontend/_test*.zip

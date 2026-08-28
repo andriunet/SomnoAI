@@ -1,0 +1,27 @@
+# SomnoAI — dependencias del backend (API + pipeline) y de los experimentos (ml/)
+# Probado con Python 3.12. Instalación:
+#   python3 -m venv --system-site-packages backend/.venv
+#   backend/.venv/bin/pip install -r backend/requirements.txt
+# Si la red tiene un proxy que intercepta TLS, añadir:
+#   --trusted-host pypi.org --trusted-host files.pythonhosted.org
+
+# ── API ──────────────────────────────────────────────
+fastapi==0.141.1            # framework de la API (contrato en docs/API_CONTRACT.md)
+uvicorn[standard]==0.52.4   # servidor ASGI (backend/run.sh)
+python-multipart==0.0.32    # carga de archivos multipart (POST /records/analyze)
+
+# ── pipeline de señal ────────────────────────────────
+mne==1.12.1                 # lectura EDF/EDF+ y anotaciones de hipnograma
+yasa==0.7.0                 # estadificación automática de sueño (archivos sin hipnograma)
+lightgbm==4.7.0             # requerido por el clasificador de YASA
+numpy==1.26.4
+scipy==1.13.1               # PSD de Welch e interpolación espectral
+
+# ── modelo ───────────────────────────────────────────
+scikit-learn==1.5.1         # Ridge / RandomForest / HistGradientBoosting
+pandas==2.2.2
+joblib==1.4.2               # empaquetado del modelo (backend/model_artifacts/model.joblib)
+
+# ── experimentos (ml/train.py) ───────────────────────
+mlflow==3.15.2              # tracking de experimentos (local y en EC2)
+matplotlib==3.9.2           # artefactos gráficos de los runs (dispersión OOF)

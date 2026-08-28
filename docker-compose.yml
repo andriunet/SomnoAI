@@ -1,0 +1,47 @@
+# MAIA / SomnoAI — despliegue local con Docker (requisito de la Entrega 2)
+#
+#   docker compose up --build
+#   → tablero:  http://localhost:8080
+#   → API:      http://localhost:8000  (docs interactivas en /docs)
+#
+# Requisitos previos:
+#   - Docker Desktop (o equivalente) instalado.
+#   - Los 3 EDF demo en backend/data/demo/ (PhysioNet sleep-edfx):
+#     SC4001E0-PSG.edf + SC4001EC-Hypnogram.edf
+#     SC4701E0-PSG.edf + SC4701EC-Hypnogram.edf
+#     SC4021E0-PSG.edf + SC4021EH-Hypnogram.edf
+#     (si faltan, la API arranca igual pero sin demos precomputados)
+#
+# El primer arranque precomputa los demos (~30 s): el healthcheck da margen.
+
+services:
+  api:
+    build: ./backend
+    container_name: maia-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # EDFs demo + base de datos + señales derivadas (persisten en el host)
+      - ./backend/data:/app/data
+      # el equipo de modelado deja aquí su model.joblib sin reconstruir la imagen
+      - ./backend/model_artifacts:/app/model_artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+
+  front:
+    image: nginx:alpine
+    container_name: maia-front
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

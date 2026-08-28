@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAIA — Estimación de edad cerebral</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  color-scheme: light;
+  --page:#f5f5f2; --surface-1:#fcfcfb; --surface-2:#f0efec; --surface-3:#e7e6e1;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.11);
+  --s1:#2a78d6; --s2:#eb6834;
+  --older:#e34948; --younger:#2a78d6;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --ok-text:#006300; --warn-text:#8a5c00;
+  --shadow:0 1px 2px rgba(11,11,11,.05), 0 4px 14px rgba(11,11,11,.05);
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface-1:#1a1a19; --surface-2:#232322; --surface-3:#2c2c2a;
+  --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.12);
+  --s1:#3987e5; --s2:#d95926;
+  --older:#e66767; --younger:#3987e5;
+  --ok-text:#0ca30c; --warn-text:#fab219;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-0.012em}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px 72px}
+.hidden{display:none !important}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.tick{font-size:10.5px;fill:var(--muted)}
+.axlbl{font-size:11px;fill:var(--muted)}
+.dlbl{font-size:11px;fill:var(--ink2);font-weight:600}
+.grow{flex:1}
+
+/* ---------- chrome ---------- */
+header{background:var(--surface-1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30}
+.hbar{max-width:1180px;margin:0 auto;padding:13px 22px;display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:9px;font-weight:650;font-size:16.5px;letter-spacing:-0.02em}
+.mark{width:27px;height:32px;flex:none;display:block;object-fit:contain}
+.sub{color:var(--muted);font-size:12.5px;border-left:1px solid var(--border);padding-left:13px}
+.user{display:flex;align-items:center;gap:9px}
+.user .av{width:27px;height:27px;border-radius:50%;background:var(--surface-3);color:var(--ink2);
+  display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.user .nm{font-size:12.5px;color:var(--ink2);line-height:1.25}
+.user .nm b{display:block;color:var(--ink);font-weight:600;font-size:13px}
+.ghost{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:7px 13px;
+  font:inherit;font-size:12.5px;color:var(--ink2);cursor:pointer}
+.ghost:hover{color:var(--ink);background:var(--surface-3)}
+nav{max-width:1180px;margin:0 auto;padding:0 22px;display:flex;gap:2px}
+nav button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;
+  font:inherit;font-size:13.5px;color:var(--ink2);cursor:pointer;white-space:nowrap}
+nav button:hover{color:var(--ink)}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--s1);font-weight:600}
+
+/* ---------- layout ---------- */
+.panel{background:var(--surface-1);border:1px solid var(--border);border-radius:13px;padding:19px;margin-top:16px}
+.panel.flat{background:var(--surface-2)}
+.panel > h3{font-size:14.5px}
+.panel .cap{color:var(--muted);font-size:12.5px;margin-top:2px;margin-bottom:15px}
+.row{display:grid;gap:16px}
+@media(min-width:920px){ .row.two{grid-template-columns:1fr 1fr} }
+.stitle{margin-top:26px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.stitle h2{font-size:20px}
+.stitle .why{color:var(--muted);font-size:12.5px}
+.mini{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.55}
+.mini b{color:var(--ink2);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2.5px 9px;border-radius:999px;
+  border:1px solid var(--border);color:var(--ink2);background:var(--surface-2);white-space:nowrap}
+.pill.ok{border-color:color-mix(in srgb,var(--good) 45%,transparent);color:var(--ok-text)}
+.pill.x{border-color:color-mix(in srgb,var(--crit) 45%,transparent);color:var(--crit)}
+.back{display:inline-flex;align-items:center;gap:7px;background:none;border:0;padding:0;margin-top:24px;
+  font:inherit;font-size:13px;color:var(--ink2);cursor:pointer}
+.back:hover{color:var(--s1)}
+.err{color:var(--crit);font-size:12.5px;margin-top:10px;display:none}
+.err.show{display:block}
+
+/* ---------- upload ---------- */
+.drop{border:1.5px dashed var(--axis);border-radius:12px;padding:58px 20px;text-align:center;
+  background:var(--surface-2);transition:.15s;cursor:pointer}
+.drop:hover,.drop.over{border-color:var(--s1);background:color-mix(in srgb,var(--s1) 5%,var(--surface-2))}
+.drop .ic{width:54px;height:54px;margin:0 auto 15px;border-radius:15px;background:var(--surface-1);
+  border:1px solid var(--border);display:grid;place-items:center;font-size:24px;box-shadow:var(--shadow)}
+.drop strong{display:block;font-size:17.5px;margin-bottom:5px;letter-spacing:-0.015em}
+.drop .hint{color:var(--muted);font-size:13px}
+.filerow{display:flex;gap:11px;align-items:center;border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;margin-top:9px;background:var(--surface-1)}
+.filerow .ic{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font-size:9px;
+  font-weight:700;color:#fff;flex:none;background:var(--s1)}
+.filerow .nm{font-weight:600;font-size:13px}
+.filerow .mt{font-size:11.5px;color:var(--muted)}
+.filerow.demo{cursor:pointer}
+.filerow.demo:hover{border-color:var(--s1);background:color-mix(in srgb,var(--s1) 5%,var(--surface-1))}
+.filerow.demo.busy{opacity:.55;pointer-events:none}
+.filerow .rm{margin-left:auto;background:none;border:1px solid var(--border);border-radius:7px;
+  width:26px;height:26px;font:inherit;font-size:13px;color:var(--muted);cursor:pointer;flex:none}
+.filerow .rm:hover{color:var(--crit);border-color:var(--crit)}
+.cta{background:var(--s1);color:#fff;border:0;border-radius:10px;padding:13px 26px;
+  font:inherit;font-size:14.5px;font-weight:600;cursor:pointer;box-shadow:var(--shadow)}
+.cta:hover{filter:brightness(1.06)}
+.cta[disabled]{background:var(--surface-3);color:var(--muted);cursor:default;box-shadow:none}
+.fields{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;margin-top:20px}
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.fld .req{color:var(--crit)}
+.fld input{background:var(--surface-1);border:1px solid var(--border);border-radius:9px;padding:10px 12px;
+  font:inherit;font-size:15px;color:var(--ink);width:112px}
+
+/* ---------- hero ---------- */
+.hero{border-radius:14px;padding:22px;border:1px solid var(--border);margin-top:16px;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--older) 9%,var(--surface-1)),var(--surface-1) 58%)}
+.hero.younger{background:linear-gradient(160deg,color-mix(in srgb,var(--younger) 9%,var(--surface-1)),var(--surface-1) 58%)}
+.heroTop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:3px}
+.heroTop h3{font-size:14.5px}
+.bigrow{display:flex;align-items:flex-end;gap:32px;flex-wrap:wrap;margin-top:16px}
+.big{display:flex;flex-direction:column}
+.big .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.big .v{font-size:48px;font-weight:640;letter-spacing:-0.035em;line-height:1.05;margin-top:3px}
+.big .v small{font-size:19px;font-weight:500;color:var(--ink2);letter-spacing:-0.01em}
+.big .n{font-size:12px;color:var(--ink2);margin-top:3px}
+.bai{padding:12px 18px;border-radius:11px;background:var(--surface-2);border:1px solid var(--border)}
+.bai .v{font-size:36px}
+.alert{display:flex;gap:11px;border-radius:10px;padding:12px 13px;font-size:12.5px;line-height:1.5;margin-top:18px}
+.alert .m{flex:none;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
+  font-size:11px;font-weight:700;margin-top:1px;background:var(--warn);color:#3a2700}
+.alert.w{background:color-mix(in srgb,var(--warn) 13%,var(--surface-1));
+  border:1px solid color-mix(in srgb,var(--warn) 50%,transparent)}
+.alert.c{background:color-mix(in srgb,var(--crit) 10%,var(--surface-1));
+  border:1px solid color-mix(in srgb,var(--crit) 45%,transparent)}
+.alert.c .m{background:var(--crit);color:#fff}
+.alert .ti{font-weight:650;display:block;margin-bottom:2px}
+
+/* ---------- tiles / tables ---------- */
+.tiles{display:grid;gap:11px;grid-template-columns:repeat(auto-fit,minmax(155px,1fr))}
+.tile{background:var(--surface-1);border:1px solid var(--border);border-radius:11px;padding:13px 14px}
+.tile .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.045em;font-weight:600}
+.tile .v{font-size:25px;font-weight:640;margin-top:3px;letter-spacing:-0.025em}
+.tile .n{font-size:11.5px;color:var(--ink2);margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:right;padding:11px;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child,th.l,td.l{text-align:left;font-variant-numeric:normal}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.045em}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr:last-child td{border-bottom:0}
+.act{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:7px;
+  border:1px solid var(--border);background:var(--surface-1);color:var(--ink2);font-size:13px}
+tbody tr:hover .act{border-color:var(--s1);color:var(--s1)}
+button.act{cursor:pointer;font:inherit;padding:0}
+tbody tr:hover .act.del{border-color:var(--border);color:var(--muted)}
+tbody tr .act.del:hover{border-color:var(--crit);color:var(--crit)}
+.actions{display:inline-flex;gap:6px}
+
+/* ---------- modal de confirmación ---------- */
+.modal{position:fixed;inset:0;background:rgba(11,11,11,.45);display:grid;place-items:center;
+  z-index:60;padding:20px}
+.mbox{width:100%;max-width:410px;background:var(--surface-1);border:1px solid var(--border);
+  border-radius:15px;padding:24px 24px 20px;box-shadow:var(--shadow)}
+.mbox h3{font-size:16px}
+.mtext{font-size:13px;color:var(--ink2);margin:9px 0 20px;line-height:1.6}
+.mtext b{color:var(--ink)}
+.mbtns{display:flex;gap:10px;justify-content:flex-end}
+.mbtns .cta{padding:10px 20px;font-size:13.5px}
+.cta.danger{background:var(--crit)}
+.cta.danger:hover{filter:brightness(1.08)}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--grid);font-size:13px}
+.kv:last-child{border-bottom:0}
+.kv span:first-child{color:var(--muted)}
+.kv span:last-child{font-weight:550;font-variant-numeric:tabular-nums;text-align:right}
+.filters{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:16px;margin-bottom:14px}
+.chipset{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.chipset button{background:var(--surface-1);border:0;border-right:1px solid var(--border);padding:7px 14px;
+  font:inherit;font-size:12.5px;color:var(--ink2);cursor:pointer}
+.chipset button:last-child{border-right:0}
+.chipset button[aria-pressed="true"]{background:var(--s1);color:#fff;font-weight:600}
+.search{background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:7px 12px;
+  font:inherit;font-size:12.5px;color:var(--ink);width:200px}
+
+/* ---------- visor de señal ---------- */
+.sigbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:13px}
+.sigbar .now{font-size:13px;font-variant-numeric:tabular-nums;font-weight:600}
+.sigbar .stg{font-size:11px;padding:2.5px 9px;border-radius:999px;color:#fff;font-weight:650;
+  letter-spacing:.03em}
+.navbtn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface-1);
+  color:var(--ink2);font:inherit;font-size:14px;cursor:pointer;display:grid;place-items:center}
+.navbtn:hover{border-color:var(--s1);color:var(--s1)}
+.navbtn[disabled]{opacity:.4;cursor:default;border-color:var(--border);color:var(--muted)}
+.slegend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--ink2);
+  margin-bottom:9px}
+.slegend i{width:13px;height:13px;border-radius:3px;display:inline-block;margin-right:6px;
+  vertical-align:-2px;border:1px solid var(--border)}
+#c-nav{cursor:pointer}
+
+/* ---------- login ---------- */
+#vLogin{min-height:86vh;display:grid;place-items:center}
+.card{width:100%;max-width:378px;background:var(--surface-1);border:1px solid var(--border);
+  border-radius:15px;padding:34px 30px;box-shadow:var(--shadow)}
+.card .brand{display:flex;flex-direction:column;align-items:center;gap:11px;margin-bottom:26px}
+.card .brand .mark{width:44px;height:52px}
+.card .brand .wm{font-size:23px;font-weight:650;letter-spacing:-0.025em}
+.card .brand .un{font-size:12px;color:var(--muted);text-align:center;line-height:1.4}
+.card h2{font-size:16px;margin-bottom:3px}
+.card .lead{font-size:12.5px;color:var(--muted);margin-bottom:20px}
+.card .fld{margin-bottom:14px}
+.card .fld input{width:100%;font-size:14px}
+.card .cta{width:100%;margin-top:6px}
+.card .foot{font-size:11.5px;color:var(--muted);margin-top:18px;text-align:center;line-height:1.5}
+
+.disclaimer{margin-top:34px;text-align:center;font-size:11.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header id="appHeader" class="hidden">
+  <div class="hbar">
+    <img class="mark" src="assets/uniandes.svg" width="220" height="261" alt="Universidad de los Andes">
+    <div class="logo">MAIA - SomnoAI</div>
+    <div class="sub">Universidad de los Andes · Estimación de edad cerebral a partir de EEG de sueño</div>
+    <div class="grow"></div>
+    <div class="user">
+      <span class="av" id="userAv">SU</span>
+      <span class="nm"><b id="userName">Superusuario</b>Sesión activa</span>
+      <button class="ghost" id="btnOut" style="margin-left:5px">Salir</button>
+    </div>
+  </div>
+  <nav role="tablist">
+    <button role="tab" aria-selected="true" data-v="vList">Registros</button>
+    <button role="tab" aria-selected="false" data-v="vUp">Analizar nuevo</button>
+  </nav>
+</header>
+
+<div class="wrap">
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<section id="vLogin">
+  <div class="card">
+    <div class="brand">
+      <img class="mark" src="assets/uniandes.svg" width="220" height="261" alt="Universidad de los Andes">
+      <div style="text-align:center">
+        <div class="wm">MAIA - SomnoAI</div>
+        <div class="un">Maestría en Inteligencia Artificial<br>Universidad de los Andes</div>
+      </div>
+    </div>
+    <h2>Iniciar sesión</h2>
+    <p class="lead">Estimación de edad cerebral a partir de EEG de sueño.</p>
+    <div class="fld">
+      <label>Usuario</label>
+      <input type="text" id="usr" value="superusuario" autocomplete="username">
+    </div>
+    <div class="fld">
+      <label>Contraseña</label>
+      <input type="password" id="pwd" value="somnoai2026" autocomplete="current-password">
+    </div>
+    <div class="err" id="loginErr"></div>
+    <button class="cta" id="btnIn">Ingresar</button>
+    <div class="foot">Acceso restringido a un único usuario administrador.<br>
+      No hay registro de cuentas nuevas.</div>
+  </div>
+</section>
+
+<!-- ══════════════ REGISTROS ══════════════ -->
+<section id="vList" class="hidden">
+  <div class="stitle">
+    <h2>Registros</h2>
+    <span class="why">Todos los análisis realizados, guardados en la base de datos.</span>
+  </div>
+
+  <div class="tiles" style="margin-top:16px">
+    <div class="tile"><div class="k">Registros analizados</div><div class="v" id="tCount">—</div>
+      <div class="n" id="tCountN">&nbsp;</div></div>
+    <div class="tile"><div class="k">Sobre el umbral</div><div class="v" id="tOver">—</div>
+      <div class="n">|BAI| mayor a 10 años</div></div>
+    <div class="tile"><div class="k">Divergencia mediana</div><div class="v" id="tMed">—</div>
+      <div class="n" id="tMedN">&nbsp;</div></div>
+    <div class="tile"><div class="k">Último análisis</div><div class="v" id="tLast">—</div>
+      <div class="n" id="tLastN">&nbsp;</div></div>
+  </div>
+
+  <div class="panel">
+    <h3>Distribución del BAI</h3>
+    <p class="cap">Un punto por registro analizado. La zona sombreada marca el umbral de priorización.</p>
+    <div id="c-strip"></div>
+  </div>
+
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">
+      <div><h3>Historial de análisis</h3>
+        <p class="cap" style="margin-bottom:0">Haga clic en cualquier fila para abrir sus resultados.</p></div>
+      <button class="cta" id="btnNew" style="padding:10px 18px;font-size:13.5px">+ Analizar nuevo</button>
+    </div>
+    <div class="filters">
+      <div class="chipset" id="filt">
+        <button aria-pressed="true" data-f="all">Todos</button>
+        <button aria-pressed="false" data-f="prio">Sobre el umbral</button>
+      </div>
+      <input class="search" id="srch" placeholder="Buscar sujeto o archivo…">
+      <span class="grow"></span>
+      <span class="mini" style="margin:0" id="cnt">&nbsp;</span>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:11px;overflow:hidden">
+      <table><thead><tr>
+        <th class="l">Sujeto</th><th class="l">Archivo</th><th class="l">Fecha</th>
+        <th>Edad real</th><th>Edad cerebral</th><th class="l">BAI</th><th class="l">Estado</th><th></th>
+      </tr></thead><tbody id="tb"></tbody></table>
+    </div>
+    <div class="mini">Cada análisis se guarda con su archivo, la edad ingresada y el resultado del modelo.
+      El listado lo sirve la API y lo consume este tablero. Los registros crecen a medida que se usa
+      la plataforma y son el insumo para revisar el rendimiento del modelo con el tiempo.</div>
+  </div>
+</section>
+
+<!-- ══════════════ ANALIZAR ══════════════ -->
+<section id="vUp" class="hidden">
+  <button class="back" id="backUp">← Volver a registros</button>
+  <div class="stitle" style="margin-top:8px"><h2>Analizar un registro</h2></div>
+
+  <div class="panel">
+    <h3>Cargar polisomnografía</h3>
+    <p class="cap">Un registro de una noche. Formatos aceptados: <b>.edf</b> y <b>.zip</b>.</p>
+    <div class="drop" id="dz">
+      <div class="ic">↑</div>
+      <strong>Arrastre aquí el archivo .edf</strong>
+      <div class="hint">o un .zip con el par PSG + hipnograma · máx. 600 MB · haga clic para buscar</div>
+    </div>
+    <input type="file" id="fileInput" accept=".edf,.zip" class="hidden">
+    <div class="filerow hidden" id="fileSel">
+      <div class="ic">EDF</div>
+      <div><div class="nm" id="fileSelName"></div><div class="mt" id="fileSelMeta"></div></div>
+      <button class="rm" id="fileSelRm" title="Quitar archivo">×</button>
+    </div>
+
+    <div class="fields">
+      <div class="fld">
+        <label>Edad cronológica</label>
+        <input type="number" id="age" value="" min="1" max="120" placeholder="auto">
+      </div>
+      <div class="grow"></div>
+      <button class="cta" id="btnRun" disabled>Analizar registro →</button>
+    </div>
+    <div class="err" id="upErr"></div>
+    <div class="mini">La edad cronológica se <b>detecta automáticamente</b> del encabezado del EDF
+      (también dentro del .zip); ingrésela solo si el archivo no la trae o si quiere fijar otra —
+      la escrita manda. La edad <b>no entra al modelo</b>: solo forma el Brain Age Index. Si el
+      archivo no incluye hipnograma, la estadificación de sueño se estima automáticamente.</div>
+  </div>
+
+  <div class="panel flat">
+    <h3>O pruebe con un registro del dataset</h3>
+    <p class="cap">Tres noches de Sleep-EDFx cargadas de antemano.</p>
+    <div class="filerow demo" data-demo="SC4001E0"><div class="ic">EDF</div>
+      <div><div class="nm">SC4001E0 · sujeto 00, noche 1</div><div class="mt">mujer, 33 años</div></div></div>
+    <div class="filerow demo" data-demo="SC4701E0"><div class="ic">EDF</div>
+      <div><div class="nm">SC4701E0 · sujeto 70, noche 1</div><div class="mt">hombre, 89 años</div></div></div>
+    <div class="filerow demo" data-demo="SC4021E0"><div class="ic">EDF</div>
+      <div><div class="nm">SC4021E0 · sujeto 02, noche 1</div><div class="mt">mujer, 26 años</div></div></div>
+  </div>
+</section>
+
+<!-- ══════════════ RESULTADO ══════════════ -->
+<section id="vRes" class="hidden">
+  <button class="back" id="backRes">← Volver a registros</button>
+  <div class="stitle" style="margin-top:8px"><h2>Resultados del análisis</h2></div>
+
+  <!-- 1 · archivo -->
+  <div class="panel">
+    <div style="display:flex;gap:13px;align-items:center;flex-wrap:wrap">
+      <div class="filerow" style="margin:0;flex:1;min-width:280px">
+        <div class="ic">EDF</div>
+        <div><div class="nm" id="resFileName"></div>
+          <div class="mt" id="resFileMeta"></div></div>
+      </div>
+      <button class="ghost" id="btnOther">Analizar otro registro</button>
+    </div>
+  </div>
+
+  <!-- 2 · hero -->
+  <div class="hero" id="hero">
+    <div class="heroTop"><h3>Edad cerebral estimada</h3><span class="pill" id="resModel"></span></div>
+    <div class="bigrow">
+      <div class="big">
+        <span class="k">Edad cerebral</span>
+        <span class="v" id="resBrain"></span>
+        <span class="n" id="resBrainN"></span>
+      </div>
+      <div class="big">
+        <span class="k">Edad cronológica</span>
+        <span class="v" style="color:var(--ink2)" id="resChron"></span>
+        <span class="n" id="resChronN">Dato ingresado al cargar el archivo</span>
+      </div>
+      <div class="big bai">
+        <span class="k">Brain Age Index</span>
+        <span class="v" id="resBai"></span>
+        <span class="n" id="resBaiN"></span>
+      </div>
+    </div>
+    <div style="margin-top:22px" id="c-scale"></div>
+    <div class="alert w" id="resAlert"><span class="m">!</span><span>
+      <span class="ti" id="resAlertTi"></span><span id="resAlertTx"></span></span>
+    </div>
+  </div>
+
+  <!-- 3 · espectro -->
+  <div class="panel">
+    <h3>Espectro frente a la norma de su edad</h3>
+    <p class="cap">Potencia espectral del EEG en sueño NREM, promediada sobre ventanas muestreadas a lo
+      largo de la noche. La banda gris es el rango observado en los sujetos de edad similar del conjunto
+      de entrenamiento.</p>
+    <div style="display:flex;gap:16px;font-size:12.5px;color:var(--ink2);margin-bottom:10px;flex-wrap:wrap">
+      <span><i style="display:inline-block;width:14px;height:2px;border-radius:2px;
+        background:var(--s1);margin-right:6px;vertical-align:4px"></i>Este sujeto</span>
+      <span><i style="display:inline-block;width:14px;height:2px;border-radius:2px;
+        background:var(--muted);margin-right:6px;vertical-align:4px"></i><span id="legNorm">Norma</span></span>
+    </div>
+    <div id="c-spectrum"></div>
+    <div class="mini" id="spectrumMini"></div>
+  </div>
+
+  <!-- 4 · señal -->
+  <div class="panel">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <h3>Señal EEG a lo largo de la noche</h3>
+      <span class="pill" id="stgSource"></span>
+    </div>
+    <p class="cap">Canal Fpz-Cz de la ventana de sueño, con el estadio anotado de fondo. Es la señal cruda
+      de la que salen las características espectrales.</p>
+
+    <div class="sigbar">
+      <div class="chipset" id="sigWin">
+        <button data-w="30">30 s</button>
+        <button data-w="120">2 min</button>
+        <button aria-pressed="true" data-w="1800">30 min</button>
+        <button data-w="7200">2 h</button>
+      </div>
+      <button class="navbtn" id="sigPrev" title="Ventana anterior">←</button>
+      <button class="navbtn" id="sigNext" title="Ventana siguiente">→</button>
+      <span class="now" id="sigNow"></span>
+      <span class="stg" id="sigStg"></span>
+      <span class="grow"></span>
+      <span class="mini" style="margin:0">Haga clic en la barra inferior para saltar a otro momento</span>
+    </div>
+
+    <div class="slegend">
+      <span style="font-weight:600;color:var(--ink)">Estadio</span>
+      <span><i style="background:#86b6ef"></i>W</span>
+      <span><i style="background:#5598e7"></i>N1</span>
+      <span><i style="background:#2a78d6"></i>N2</span>
+      <span><i style="background:#184f95"></i>N3</span>
+      <span><i style="background:#eb6834"></i>REM</span>
+      <span style="color:var(--muted)">· la profundidad del azul sigue la profundidad del sueño; REM va aparte</span>
+    </div>
+
+    <div id="c-signal"></div>
+    <div id="c-nav"></div>
+
+    <div class="mini">Las bandas de estadio salen del <b>hipnograma</b>: el anotado del dataset cuando el
+      archivo lo incluye, o el estimado automáticamente durante el análisis para registros nuevos.</div>
+  </div>
+
+  <!-- 5 · calidad -->
+  <div class="panel">
+    <h3>Calidad del registro</h3>
+    <p class="cap">Qué contiene el archivo y qué parte de él alimentó al modelo.</p>
+    <div id="c-quality"></div>
+    <div class="row two" style="margin-top:22px;gap:40px">
+      <div>
+        <h4 style="font-size:12.5px;margin-bottom:6px">El archivo</h4>
+        <div id="kvFile"></div>
+      </div>
+      <div>
+        <h4 style="font-size:12.5px;margin-bottom:6px">Lo que se analizó</h4>
+        <div id="kvAnalysis"></div>
+      </div>
+    </div>
+    <div class="mini">Los registros Sleep Cassette duran hasta <b>22 horas</b> porque incluyen el día
+      alrededor de la noche. Recortar esa vigilia es obligatorio: sin recorte, la mayoría de las épocas
+      del registro son vigilia y el espectro quedaría dominado por señal despierta.</div>
+  </div>
+</section>
+
+<div class="disclaimer">SomnoAI · MAIA — Prototipo académico de apoyo analítico.
+  No es un instrumento de diagnóstico clínico.</div>
+
+</div>
+
+<!-- ══════════════ MODAL: confirmar borrado ══════════════ -->
+<div class="modal hidden" id="modal">
+  <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <h3 id="mTitle">¿Borrar este registro?</h3>
+    <p class="mtext" id="mText"></p>
+    <div class="mbtns">
+      <button class="ghost" id="mCancel">Cancelar</button>
+      <button class="cta danger" id="mConfirm">Borrar registro</button>
+    </div>
+  </div>
+</div>
+
+<!-- ?v=N evita que el navegador use JS viejo en caché tras una actualización -->
+<script src="js/config.js?v=4"></script>
+<script src="js/charts.js?v=4"></script>
+<script src="js/mock.js?v=4"></script>
+<script src="js/api.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
+</body>
+</html>
