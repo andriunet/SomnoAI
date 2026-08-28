@@ -15,6 +15,53 @@
   let query = "";
   let selFile = null;      // archivo elegido en vUp
 
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ══════════════ tema (claro / oscuro) ══════════════ */
+  const THEME_KEY = "maia_theme";
+  const ICONS = {
+    light: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19"/></svg>',
+    dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 14.2A8.2 8.2 0 0 1 9.8 3.6a8.2 8.2 0 1 0 10.6 10.6Z"/></svg>'
+  };
+
+  function themeButtons() { return ["btnTheme", "btnThemeLogin"].map($).filter(Boolean); }
+
+  function applyTheme(t, rerender = true) {
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem(THEME_KEY, t);
+    // el icono muestra a qué tema se cambiará
+    themeButtons().forEach(b => { b.innerHTML = t === "dark" ? ICONS.light : ICONS.dark; });
+    if (rerender) rerenderCharts(); // los SVG leen los colores al dibujarse
+  }
+
+  function rerenderCharts() {
+    if (!$("vList").classList.contains("hidden") && records.length)
+      C.renderStrip($("c-strip"), records, CFG.thresholdYears);
+    if (!$("vRes").classList.contains("hidden") && current) {
+      C.renderScale($("c-scale"), current);
+      C.renderSpectrum($("c-spectrum"), current);
+      C.renderQuality($("c-quality"), current);
+      C.SignalViewer.render();
+    }
+  }
+
+  applyTheme(localStorage.getItem(THEME_KEY)
+    || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"), false);
+  themeButtons().forEach(b => b.onclick = () =>
+    applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+
+  /* contador animado para los KPI numéricos */
+  function countUp(el, to) {
+    if (reducedMotion || !(to > 0)) { el.textContent = to; return; }
+    const t0 = performance.now(), dur = 500;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = Math.round(to * (p * (2 - p))); // ease-out
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
   /* ── formato de fechas ── */
   const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   const dShort = { format: d => `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}` };
@@ -34,10 +81,10 @@
   /* ══════════════ vista REGISTROS ══════════════ */
   function renderTiles() {
     const n = records.length;
-    $("tCount").textContent = n;
+    countUp($("tCount"), n);
     const subjects = new Set(records.map(r => r.subject_code)).size;
     $("tCountN").textContent = `${subjects} sujeto${subjects === 1 ? "" : "s"} distintos`;
-    $("tOver").textContent = records.filter(r => Math.abs(r.bai) > CFG.thresholdYears).length;
+    countUp($("tOver"), records.filter(r => Math.abs(r.bai) > CFG.thresholdYears).length);
     if (n) {
       const bais = records.map(r => r.bai);
       $("tMed").textContent = nf(median(bais.map(Math.abs)));
@@ -82,6 +129,14 @@
   }
 
   async function refreshList() {
+    // skeleton mientras llega el primer listado
+    if (!records.length) {
+      $("cnt").textContent = "cargando…";
+      $("tb").innerHTML = Array.from({ length: 4 }, () =>
+        `<tr>${Array.from({ length: 8 }, (_, i) =>
+          `<td class="${i < 3 ? "l" : ""}"><span class="skel" style="width:${i === 1 ? 120 : 52}px">&nbsp;</span></td>`
+        ).join("")}</tr>`).join("");
+    }
     try {
       records = await MaiaAPI.listRecords();
       records.sort((a, b) => parseAt(b.analyzed_at) - parseAt(a.analyzed_at));
@@ -124,7 +179,7 @@
     if (!toDelete) return;
     const btn = $("mConfirm"), orig = btn.textContent;
     btn.disabled = true;
-    btn.textContent = "Borrando…";
+    btn.innerHTML = '<span class="spin"></span>Borrando…';
     try {
       await MaiaAPI.deleteRecord(toDelete.id);
       closeModal();
@@ -397,7 +452,7 @@
     const age = raw === "" ? null : parseInt(raw, 10);
     hideErr($("upErr"));
     btn.disabled = true;
-    btn.textContent = "Analizando registro…";
+    btn.innerHTML = '<span class="spin"></span>Analizando registro…';
     try {
       const d = await MaiaAPI.analyze(selFile, age);
       clearFile();
@@ -415,7 +470,7 @@
     const demoId = el.dataset.demo;
     el.classList.add("busy");
     const nm = el.querySelector(".mt"), orig = nm.textContent;
-    nm.textContent = "Analizando registro…";
+    nm.innerHTML = '<span class="spin"></span>Analizando registro…';
     try {
       const d = await MaiaAPI.analyzeDemo(demoId);
       showResult(d);
@@ -450,7 +505,7 @@
     hideErr($("loginErr"));
     const btn = $("btnIn"), orig = btn.textContent;
     btn.disabled = true;
-    btn.textContent = "Ingresando…";
+    btn.innerHTML = '<span class="spin"></span>Ingresando…';
     try {
       const user = await MaiaAPI.login($("usr").value.trim(), $("pwd").value);
       enterApp(user);

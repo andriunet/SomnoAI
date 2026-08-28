@@ -230,11 +230,14 @@
       const W = 1080, H = 248, L = 52, R = 14, Tp = 10, B = 52, TRK = 22, pw = W - L - R, ph = H - Tp - B - TRK;
       const points = Math.round(pw);
 
+      const sigBox = document.getElementById("c-signal");
+      sigBox.classList.add("loading");
       let env;
       try {
         env = await MaiaAPI.getSignal(this.detail.id, t0, this.win, points);
-      } catch (e) { return; }
+      } catch (e) { sigBox.classList.remove("loading"); return; }
       if (my !== this._token) return; // llegó tarde: hubo otra petición después
+      sigBox.classList.remove("loading");
 
       const s = svg(W, H);
       s.setAttribute("aria-label", "Señal EEG del registro");
