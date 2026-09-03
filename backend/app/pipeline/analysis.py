@@ -172,7 +172,7 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     features["spindle_amp"] = nrm["subject_spindle_amp"]
 
     # ── modelo ──
-    brain_age, meta = predictor.predict(features)
+    brain_age, meta = predictor.predict(features, chronological_age)
     brain_age = round(float(brain_age), 1)
     bai = round(brain_age - chronological_age, 1)
     err = meta["typical_error"]

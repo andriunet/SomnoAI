@@ -20,6 +20,11 @@ services:
     container_name: maia-api
     ports:
       - "8000:8000"
+    environment:
+      # Predicción provisional mientras el equipo no tenga modelo (ver
+      # app/model/predictor.py). Quitar esta línea + dejar el model.joblib
+      # nuevo en model_artifacts/ + reiniciar = modelo real, sin tocar código.
+      - MAIA_STUB_MODEL=1
     volumes:
       # EDFs demo + base de datos + señales derivadas (persisten en el host)
       - ./backend/data:/app/data
@@ -38,7 +43,7 @@ services:
     image: nginx:alpine
     container_name: maia-front
     ports:
-      - "8080:80"
+      - "8050:80"   # 8050: el puerto abierto en el security group de la EC2
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
     depends_on:

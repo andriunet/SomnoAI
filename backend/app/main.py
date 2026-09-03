@@ -90,10 +90,8 @@ async def http_exc(_, exc: HTTPException):
 @app.get("/api/v1/health")
 def health():
     """Sin auth: para el healthcheck de Docker Compose y monitoreo."""
-    from .model.predictor import _load_bundle
-    bundle = _load_bundle()
     return {"status": "ok", "records": db.count(),
-            "model": bundle["meta"]["version"] if bundle else "heuristic-v0 (provisional)"}
+            "model": predictor.active_version()}
 
 
 # ── auth ──────────────────────────────────────────────────────────────

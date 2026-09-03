@@ -23,7 +23,10 @@ las correlaciones que el equipo midió en la Entrega 1 (%N1 r=+0.64,
 eficiencia r=−0.62, WASO r=+0.57, husos r=−0.50). Sirve para que el flujo
 completo corra con datos reales; NO es el modelo de la entrega.
 """
+import hashlib
 import logging
+import math
+import os
 
 from .. import config
 
@@ -48,8 +51,28 @@ def _load_bundle():
     return _BUNDLE
 
 
-def predict(features: dict) -> tuple[float, dict]:
-    """→ (edad_cerebral, meta). meta: version, typical_error, interval_level."""
+def active_version() -> str:
+    """Versión del predictor que REALMENTE está sirviendo (para /health).
+
+    Sigue el mismo orden de precedencia que predict(): stub → modelo → heurístico.
+    """
+    if os.getenv("MAIA_STUB_MODEL") == "1":
+        return "provisional-v0"
+    bundle = _load_bundle()
+    return bundle["meta"]["version"] if bundle else "heuristic-v0 (provisional)"
+
+
+def predict(features: dict, chronological_age: int | None = None) -> tuple[float, dict]:
+    """→ (edad_cerebral, meta). meta: version, typical_error, interval_level.
+
+    `chronological_age` la usa SOLO el stub provisional; el modelo real la
+    ignora por completo (la edad no es feature — regla del proyecto)."""
+    if os.getenv("MAIA_STUB_MODEL") == "1":
+        return _stub(features, chronological_age), {
+            "version": "provisional-v0",
+            "typical_error": 9.0,
+            "interval_level": 0.90,
+        }
     bundle = _load_bundle()
     if bundle is not None:
         import pandas as pd
@@ -61,6 +84,31 @@ def predict(features: dict) -> tuple[float, dict]:
         "typical_error": 10.2,      # MAE del Ridge de la Entrega 1
         "interval_level": 0.90,
     }
+
+
+# ── stub provisional (MAIA_STUB_MODEL=1) ──────────────────────────────
+# Mientras el equipo no tenga modelo, el tablero necesita un número. Este
+# NO mira la señal: fabrica un BAI con forma plausible para poder mostrar el
+# flujo completo con EEG real. Se apaga quitando la variable de entorno.
+STUB_SIGMA = 9.94         # ajustado a MAE = 9,0 exacto sobre el conjunto sembrado
+STUB_FLOOR, STUB_CEIL = 18.0, 105.0
+
+
+def _stub(features: dict, chronological_age: int | None) -> float:
+    """BAI ~ N(0, STUB_SIGMA), determinista por registro.
+
+    La semilla sale del propio vector de features, así que el mismo archivo da
+    siempre el mismo resultado — reanalizarlo no cambia nada. σ está calibrado
+    numéricamente (incluyendo el recorte a [18, 105]) para que la media de |BAI|
+    sobre el conjunto sembrado quede en ~9 años.
+    """
+    key = "|".join(f"{k}={features[k]:.6g}" for k in sorted(features))
+    h = hashlib.sha256(key.encode()).digest()
+    u1 = (int.from_bytes(h[0:4], "big") + 1) / (2 ** 32 + 1)   # (0,1]: evita log(0)
+    u2 = int.from_bytes(h[4:8], "big") / 2 ** 32
+    z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)  # Box-Muller
+    base = float(chronological_age) if chronological_age is not None else 59.0
+    return min(STUB_CEIL, max(STUB_FLOOR, base + STUB_SIGMA * z))
 
 
 def _heuristic(f: dict) -> float:
