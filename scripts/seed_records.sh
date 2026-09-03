@@ -6,7 +6,9 @@
 # hipnograma ANOTADO y no necesita estimarlo con YASA), lo manda a la API y
 # borra los EDF. La edad la detecta la API del encabezado del EDF.
 #
-# Al final imprime el MAE realizado — la media de |BAI| sobre lo sembrado.
+# Al final imprime el MAE realizado — la media de |BAI| sobre lo sembrado. Debe
+# caer cerca de los 10,43 años de validación cruzada del modelo; muy por debajo
+# sería sospechoso, no una buena noticia.
 #
 #   sh scripts/seed_records.sh            # contra la API local
 #   API=http://otra:8000/api/v1 sh ...    # contra otra
@@ -89,7 +91,7 @@ if not rows:
 bais = [abs(float(r[2])) for r in rows]
 mae = sum(bais) / len(bais)
 print(f"Registros sembrados : {len(rows)}")
-print(f"MAE realizado       : {mae:.2f} años   (objetivo ≈ 9)")
+print(f"MAE realizado       : {mae:.2f} años   (CV del modelo: 10,43)")
 print(f"|BAI| mín / máx     : {min(bais):.1f} / {max(bais):.1f}")
 over = sum(1 for b in bais if b > 10)
 print(f"Sobre el umbral ±10 : {over} de {len(rows)}")
