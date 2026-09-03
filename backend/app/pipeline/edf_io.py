@@ -58,7 +58,11 @@ def read_subject_header(psg_path: str) -> dict:
 
 
 def load_raw(psg_path: str):
-    """Lee el EDF, valida el canal EEG y devuelve (raw solo-EEG, n_canales_originales)."""
+    """Lee el EDF, valida el canal EEG principal y devuelve (raw, n_canales_originales).
+
+    Conserva también EEG_CHANNEL_2 (Pz-Oz) cuando el archivo lo trae: es opcional,
+    solo enriquece features en analysis.py y nunca se exige para validar el archivo.
+    """
     try:
         raw = mne.io.read_raw_edf(psg_path, preload=False, verbose="ERROR")
     except Exception as e:
@@ -69,6 +73,9 @@ def load_raw(psg_path: str):
             f"El archivo no contiene el canal «{config.EEG_CHANNEL}» "
             f"(canales presentes: {', '.join(raw.ch_names[:8])}…). "
             "SomnoAI analiza polisomnografías con la convención de Sleep-EDFx.")
-    raw.pick([config.EEG_CHANNEL])
+    keep = [config.EEG_CHANNEL]
+    if config.EEG_CHANNEL_2 in raw.ch_names:
+        keep.append(config.EEG_CHANNEL_2)
+    raw.pick(keep)
     raw.load_data(verbose="ERROR")
     return raw, n_channels

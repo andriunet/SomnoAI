@@ -14,6 +14,7 @@ USERNAME = "superusuario"
 PASSWORD = "somnoai2026"
 
 EEG_CHANNEL = "EEG Fpz-Cz"
+EEG_CHANNEL_2 = "EEG Pz-Oz"  # opcional: si el EDF lo trae, enriquece features (nunca se exige)
 EPOCH_S = 30
 MARGIN_EPOCHS = 60            # 30 min de margen alrededor del sueño (criterio Entrega 1)
 SPECTRUM_WINDOWS = 30         # épocas NREM muestreadas para el espectro del panel

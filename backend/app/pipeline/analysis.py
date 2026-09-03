@@ -62,6 +62,26 @@ def _band_powers(freqs: np.ndarray, psd: np.ndarray, prefix: str) -> dict:
     return out
 
 
+def _sef95(freqs: np.ndarray, psd: np.ndarray) -> float:
+    """Frecuencia de borde espectral al 95% de la potencia acumulada (0,5-25 Hz)."""
+    m = (freqs >= 0.5) & (freqs <= 25)
+    f, p = freqs[m], psd[m]
+    cum = np.cumsum(p)
+    cum = cum / cum[-1]
+    idx = int(np.searchsorted(cum, 0.95))
+    return float(f[min(idx, len(f) - 1)])
+
+
+def _spectral_block(sig_ch: np.ndarray, epoch_idx: list[int], sfreq: float,
+                     epoch_samples: int, grid: np.ndarray, prefix: str):
+    """PSD media de un canal/estadio, interpolada a `grid` → bandas abs/rel + SEF95."""
+    fs_, ps_ = _mean_psd(sig_ch, epoch_idx, sfreq, epoch_samples)
+    g = np.maximum(interp1d(fs_, ps_, bounds_error=False, fill_value="extrapolate")(grid), 1e-4)
+    feats = _band_powers(grid, g, prefix)
+    feats[f"sef95_{prefix}"] = _sef95(grid, g)
+    return feats, g
+
+
 def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb: float | None,
                  chronological_age: int, sex: str | None, subject_code: str | None,
                  predictor) -> tuple[dict, dict, np.ndarray, float]:
@@ -122,7 +142,11 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     st_win = stages_full[w0:w1].copy()
     n_win = len(st_win)
 
-    sig = raw.get_data(start=w0 * epoch_samples, stop=w1 * epoch_samples)[0] * 1e6  # µV
+    sig = raw.get_data(picks=[config.EEG_CHANNEL],
+                       start=w0 * epoch_samples, stop=w1 * epoch_samples)[0] * 1e6  # µV
+    sig2 = (raw.get_data(picks=[config.EEG_CHANNEL_2], start=w0 * epoch_samples,
+                         stop=w1 * epoch_samples)[0] * 1e6
+            if config.EEG_CHANNEL_2 in raw.ch_names else None)
     del raw  # liberar memoria del registro completo
 
     unscored_ct = int(np.sum(st_win == -1))
@@ -133,22 +157,25 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     if len(nrem_idx) < 10:
         raise NoSleepDetected("Muy pocas épocas NREM utilizables para calcular el espectro.")
     sampled = sorted({nrem_idx[int(k)] for k in np.linspace(0, len(nrem_idx) - 1, config.SPECTRUM_WINDOWS)})
-    f_raw, psd_raw = _mean_psd(sig, sampled, sfreq, epoch_samples)
 
     grid = np.round(np.arange(config.FREQ_GRID_START, config.FREQ_GRID_STOP + 1e-9,
                               config.FREQ_GRID_STEP), 1)
-    psd_grid = interp1d(f_raw, psd_raw, bounds_error=False, fill_value="extrapolate")(grid)
-    psd_grid = np.maximum(psd_grid, 1e-4)
 
-    # ── features espectrales (NREM y por estadio) ──
-    features = _band_powers(grid, psd_grid, "nrem")
+    # ── features espectrales (NREM y por estadio); Pz-Oz se suma con prefijo "pzoz_"
+    # cuando el EDF trae ese canal (config.EEG_CHANNEL_2) — nunca se exige ──
+    features, psd_grid = _spectral_block(sig, sampled, sfreq, epoch_samples, grid, "nrem")
+    if sig2 is not None:
+        feats2, _ = _spectral_block(sig2, sampled, sfreq, epoch_samples, grid, "pzoz_nrem")
+        features.update(feats2)
     for st_code, name in ((2, "n2"), (3, "n3"), (4, "rem")):
         idx = [int(i) for i in np.where(st_win == st_code)[0]]
         if len(idx) >= 5:
             pick = sorted({idx[int(k)] for k in np.linspace(0, len(idx) - 1, min(20, len(idx)))})
-            fs_, ps_ = _mean_psd(sig, pick, sfreq, epoch_samples)
-            g = interp1d(fs_, ps_, bounds_error=False, fill_value="extrapolate")(grid)
-            features.update(_band_powers(grid, np.maximum(g, 1e-4), name))
+            feats, _ = _spectral_block(sig, pick, sfreq, epoch_samples, grid, name)
+            features.update(feats)
+            if sig2 is not None:
+                feats2, _ = _spectral_block(sig2, pick, sfreq, epoch_samples, grid, f"pzoz_{name}")
+                features.update(feats2)
 
     # ── features de arquitectura (dentro del bloque principal de sueño) ──
     sp0, sp1 = first_sleep, last_sleep + 1
@@ -238,7 +265,7 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
                 "total_duration_s": int(total_s),
                 "sampling_hz": int(sfreq),
                 "channels": n_channels,
-                "channel_used": config.EEG_CHANNEL,
+                "channel_used": config.EEG_CHANNEL + (f" + {config.EEG_CHANNEL_2}" if sig2 is not None else ""),
                 "subject_night": subject_night,
             },
             "analysis": {
