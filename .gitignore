@@ -4,14 +4,19 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# datos (pesados — se descargan con backend/data/demo/download_demos.sh o dvc pull)
+# datos (pesados — se descargan con backend/data/demo/download_demos.sh, backend/data/full/download_full.sh, o dvc pull)
 backend/data/demo/*.edf
 backend/data/dataset/
 backend/data/store/
+backend/data/full/*.edf
 
 # salidas generadas (se regeneran con ml/build_features.py y ml/train.py)
 ml/out/
 ml/mlserver/
+
+# mlflow local (se genera al correr ml/train.py sin tracking server)
+/mlflow.db
+/mlruns/
 
 # temporales
 *.part

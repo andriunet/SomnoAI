@@ -13,11 +13,17 @@ Uso:
     # contra un tracking server (local o EC2)
     MLFLOW_TRACKING_URI=http://<IP>:5000 ./backend/.venv/bin/python ml/train.py
 
+    # con la partición fija del proyecto (dev/test por sujeto, ver
+    # ml/subject_split_seed42.json): la métrica defendible sigue siendo la de
+    # CV sobre dev; el número de test se calcula una sola vez, al final.
+    ./backend/.venv/bin/python ml/train.py --split ml/subject_split_seed42.json
+
 La edad cronológica NO es feature. El bundle final queda en ml/out/model.joblib:
 cuando esté entrenado con las 153 noches, copiarlo a backend/model_artifacts/
 para que la API lo sirva.
 """
 import argparse
+import json
 from pathlib import Path
 
 import joblib
@@ -58,17 +64,40 @@ def oof_predictions(model_fn, X, y, groups):
     return oof, n_splits
 
 
+def load_split(path) -> tuple[set, set]:
+    """Lee una partición fija (ver ml/subject_split_seed42.json) → (dev_ids, test_ids)."""
+    d = json.loads(Path(path).read_text())
+    return set(d["train_validation_subject_ids"]), set(d["test_subject_ids"])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--features", default=str(HERE / "out" / "features.csv"))
     ap.add_argument("--experiment", default="somnoai-brain-age")
+    ap.add_argument("--split", default=None,
+                    help="JSON con partición fija dev/test por sujeto (ej. subject_split_seed42.json). "
+                         "Si se omite, la CV corre sobre todas las noches (comportamiento previo).")
     args = ap.parse_args()
 
     df = pd.read_csv(args.features)
     feature_names = [c for c in df.columns if c not in META_COLS]
-    X, y, groups = df[feature_names], df["age"], df["subject"].values
+
+    dev_df, test_df = df, None
+    if args.split:
+        dev_ids, test_ids = load_split(args.split)
+        present = set(df["subject"])
+        missing = (dev_ids | test_ids) - present
+        if missing:
+            print(f"⚠ {len(missing)} sujetos de la partición no están en {args.features} "
+                  f"(dataset incompleto): {sorted(missing)[:10]}{'…' if len(missing) > 10 else ''}")
+        dev_df = df[df["subject"].isin(dev_ids)].reset_index(drop=True)
+        test_df = df[df["subject"].isin(test_ids)].reset_index(drop=True)
+        print(f"partición fija: {len(dev_df)} noches / {dev_df['subject'].nunique()} sujetos dev · "
+              f"{len(test_df)} noches / {test_df['subject'].nunique()} sujetos test")
+
+    X, y, groups = dev_df[feature_names], dev_df["age"], dev_df["subject"].values
     n_subj = len(np.unique(groups))
-    print(f"{len(df)} noches · {n_subj} sujetos · {len(feature_names)} features")
+    print(f"{len(dev_df)} noches · {n_subj} sujetos (dev) · {len(feature_names)} features")
     if n_subj < 10:
         print("⚠ MUESTRA PEQUEÑA: los números no son representativos; esto valida el "
               "flujo de experimentación. Corra build_features.py sobre las 153 noches "
@@ -89,15 +118,30 @@ def main():
 
             mlflow.log_params({
                 "model": name, "cv": f"GroupKFold(k={n_splits}) por sujeto",
-                "n_nights": len(df), "n_subjects": n_subj,
+                "n_nights": len(dev_df), "n_subjects": n_subj,
                 "n_features": len(feature_names), "target": "edad (años)",
                 "age_as_feature": False,
+                "split": args.split or "none (CV sobre todas las noches)",
             })
             mlflow.log_metrics({
                 "mae_oof": mae, "rmse_oof": rmse, "r2_oof": r2,
                 "naive_mae": naive_mae,
                 "bai_age_corr": bai_corr,  # ≠ 0 ⇒ falta calibrar regresión a la media
             })
+
+            test_mae = None
+            if test_df is not None and len(test_df):
+                m_dev = model_fn()
+                m_dev.fit(X, y)
+                X_test, y_test = test_df[feature_names], test_df["age"]
+                pred_test = m_dev.predict(X_test)
+                test_mae = mean_absolute_error(y_test, pred_test)
+                test_naive_mae = float(np.mean(np.abs(y_test - y.mean())))
+                mlflow.log_metrics({
+                    "mae_test_heldout": test_mae,
+                    "naive_mae_test": test_naive_mae,
+                    "bai_age_corr_test": pearsonr(pred_test - y_test, y_test)[0] if len(y_test) > 2 else float("nan"),
+                })
 
             fig, ax = plt.subplots(figsize=(5, 5))
             ax.scatter(y, oof, alpha=0.7)
@@ -111,13 +155,20 @@ def main():
             plt.close(fig)
 
             results[name] = mae
+            test_str = f" · MAE test (una vez) {test_mae:5.1f}" if test_mae is not None else ""
             print(f"  {name:14s} MAE {mae:5.1f} · RMSE {rmse:5.1f} · R² {r2:5.2f} "
-                  f"· corr(BAI,edad) {bai_corr:+.2f}")
+                  f"· corr(BAI,edad) {bai_corr:+.2f}{test_str}")
+
+    if test_df is not None:
+        print("\n⚠ La cifra defendible es la de CV sobre dev (mae_oof); el MAE de test se mira "
+              "una sola vez por experimento y se sesga a la baja si se vuelve a consultar.")
 
     # ── bundle del mejor modelo, en el formato que consume la API ──
+    # se reentrena con TODAS las noches disponibles (dev + test) para el artefacto de
+    # producción; la métrica reportada sigue siendo la de CV sobre dev, nunca esta.
     best = min(results, key=results.get)
     final = MODELS[best]()
-    final.fit(X, y)
+    final.fit(df[feature_names], df["age"])
     bundle = {
         "model": final,
         "feature_names": feature_names,
