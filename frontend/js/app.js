@@ -406,7 +406,14 @@
     }
     if (/hypnogram/i.test(file.name) && /\.edf$/i.test(file.name)) {
       showErr($("upErr"), "Ese archivo es solo el hipnograma (las anotaciones de estadios, sin señal EEG). " +
-        "Cargue el PSG (…-PSG.edf) o un .zip con el par PSG + hipnograma.");
+        "Cargue un .zip con el par PSG + hipnograma.");
+      return;
+    }
+    // El modelo necesita el hipnograma anotado: un .edf suelto se rechaza aquí en vez
+    // de dejar que el usuario espere el análisis para recibir un 422 del servidor.
+    if (/\.edf$/i.test(file.name)) {
+      showErr($("upErr"), "Un .edf suelto no trae el hipnograma. El modelo se entrenó con " +
+        "etapas anotadas por expertos, así que cargue el .zip con el par PSG + hipnograma.");
       return;
     }
     if (file.size > CFG.maxUploadMB * 1048576) {

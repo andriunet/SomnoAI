@@ -1,7 +1,0 @@
-.venv
-data
-model_artifacts
-__pycache__
-**/__pycache__
-*.pyc
-.DS_Store

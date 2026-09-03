@@ -13,7 +13,11 @@ DB_PATH = STORE_DIR / "maia.db"
 USERNAME = "superusuario"
 PASSWORD = "somnoai2026"
 
-EEG_CHANNEL = "EEG Fpz-Cz"
+EEG_CHANNEL = "EEG Fpz-Cz"          # el que se muestra en el visor y alimenta los paneles
+# El modelo empaquetado usa los dos canales de EEG. Se validan al abrir el
+# archivo, no cuando predice: si falta uno, el análisis completo (minutos de
+# espectros) se habría tirado para nada.
+EEG_CHANNELS_MODELO = ("EEG Fpz-Cz", "EEG Pz-Oz")
 EPOCH_S = 30
 MARGIN_EPOCHS = 60            # 30 min de margen alrededor del sueño (criterio Entrega 1)
 SPECTRUM_WINDOWS = 30         # épocas NREM muestreadas para el espectro del panel

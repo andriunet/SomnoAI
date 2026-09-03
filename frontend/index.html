@@ -430,8 +430,8 @@ body,header,.panel,.tile,.card,.mbox,.filerow,.drop,.chipset button,nav button,.
     <p class="cap">Un registro de una noche. Formatos aceptados: <b>.edf</b> y <b>.zip</b>.</p>
     <div class="drop" id="dz">
       <div class="ic">↑</div>
-      <strong>Arrastre aquí el archivo .edf</strong>
-      <div class="hint">o un .zip con el par PSG + hipnograma · máx. 600 MB · haga clic para buscar</div>
+      <strong>Arrastre aquí el .zip del registro</strong>
+      <div class="hint">PSG + hipnograma · máx. 600 MB · haga clic para buscar</div>
     </div>
     <input type="file" id="fileInput" accept=".edf,.zip" class="hidden">
     <div class="filerow hidden" id="fileSel">
@@ -451,8 +451,10 @@ body,header,.panel,.tile,.card,.mbox,.filerow,.drop,.chipset button,nav button,.
     <div class="err" id="upErr"></div>
     <div class="mini">La edad cronológica se <b>detecta automáticamente</b> del encabezado del EDF
       (también dentro del .zip); ingrésela solo si el archivo no la trae o si quiere fijar otra —
-      la escrita manda. La edad <b>no entra al modelo</b>: solo forma el Brain Age Index. Si el
-      archivo no incluye hipnograma, la estadificación de sueño se estima automáticamente.</div>
+      la escrita manda. La edad <b>no entra al modelo</b>: solo forma el Brain Age Index.
+      El registro debe incluir <b>hipnograma anotado</b>: cargue el .zip con el par
+      PSG + hipnograma. El modelo se entrenó con etapas anotadas por expertos y
+      estimarlas automáticamente daría un resultado poco fiable.</div>
   </div>
 
   <div class="panel flat">
@@ -563,8 +565,8 @@ body,header,.panel,.tile,.card,.mbox,.filerow,.drop,.chipset button,nav button,.
     <div id="c-signal"></div>
     <div id="c-nav"></div>
 
-    <div class="mini">Las bandas de estadio salen del <b>hipnograma</b>: el anotado del dataset cuando el
-      archivo lo incluye, o el estimado automáticamente durante el análisis para registros nuevos.</div>
+    <div class="mini">Las bandas de estadio salen del <b>hipnograma anotado</b> que acompaña al
+      registro, el mismo del que salen las características de arquitectura del sueño que usa el modelo.</div>
   </div>
 
   <!-- 5 · calidad -->

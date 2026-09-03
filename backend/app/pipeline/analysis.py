@@ -72,16 +72,21 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     total_s = raw.n_times / sfreq
 
     # ── hipnograma ──
-    if hyp_path:
-        stages_full = staging.from_annotations(hyp_path, total_s)
-        staging_source = "annotated"
-    else:
-        if not staging.yasa_available():
-            raise edf_io.InvalidFile(
-                "El archivo no incluye hipnograma y la estadificación automática no está "
-                "disponible en el servidor. Cargue un .zip con el par PSG + hipnograma.")
-        stages_full = staging.auto_yasa(raw)
-        staging_source = "auto"
+    # El modelo EXIGE hipnograma anotado. Se midió: sobre SC4001E0, con anotación da
+    # 24,8 años y con etapas estimadas por YASA da 46,2 — 21 años de diferencia, el
+    # doble del MAE del modelo. La causa es que %N3, eficiencia y minutos_despierto
+    # son features que entran directas al modelo, y las de un estadificador automático
+    # no son las que vio al entrenar. Un número plausible y equivocado es peor que un
+    # error, así que se rechaza.
+    if not hyp_path:
+        raise edf_io.InvalidFile(
+            "Este registro no incluye hipnograma. El modelo de edad cerebral se entrenó "
+            "con hipnogramas anotados por expertos y sus características de arquitectura "
+            "del sueño dependen de ellos, así que estimarlos automáticamente daría un "
+            "resultado poco fiable. Cargue un .zip con el par PSG + hipnograma "
+            "(…-PSG.edf y …-Hypnogram.edf).")
+    stages_full = staging.from_annotations(hyp_path, total_s)
+    staging_source = "annotated"
 
     sleep_idx = np.where((stages_full >= 1) & (stages_full <= 4))[0]
     if len(sleep_idx) < 20:  # < 10 min de sueño
@@ -172,7 +177,10 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     features["spindle_amp"] = nrm["subject_spindle_amp"]
 
     # ── modelo ──
-    brain_age, meta = predictor.predict(features, chronological_age)
+    # El paquete edad_cerebral extrae sus propias 32 características del archivo:
+    # tienen que ser exactamente las del entrenamiento, y las de arriba son las
+    # que alimentan los paneles del tablero, que son otras.
+    brain_age, meta, model_features = predictor.predict(psg_path, hyp_path)
     brain_age = round(float(brain_age), 1)
     bai = round(brain_age - chronological_age, 1)
     err = meta["typical_error"]
@@ -251,7 +259,10 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
                 "wake_trimmed_s": int(max(total_s - window_s, 0)),
             },
         },
-        "features": features,  # se expone para trazabilidad / depuración del equipo
+        # Las que entraron al modelo (las 32 del paquete), no las de los paneles:
+        # si alguien audita una predicción, estas son las que la explican.
+        "features": model_features,
+        "features_panel": features,   # las del tablero (espectro, husos, arquitectura)
     }
     return summary, detail, sig, sfreq
 

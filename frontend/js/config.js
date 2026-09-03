@@ -15,7 +15,7 @@ window.MAIA_CONFIG = {
   // localhost que en la EC2, sin escribir ninguna IP en el repo.
   apiBase: "http://" + location.hostname + ":8000/api/v1",   // ← null = modo demo (mock)
 
-  // Tiempo máximo de espera para POST /records/analyze (el análisis real
+  // Tiempo máximo de espera para POST /predict (el análisis real
   // de un EDF puede tardar minutos: carga + estadificación + espectros).
   analyzeTimeoutMs: 10 * 60 * 1000,
 

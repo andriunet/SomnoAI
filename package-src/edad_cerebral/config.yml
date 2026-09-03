@@ -5,8 +5,8 @@
 # Los valores salen de los notebooks 02_caracteristicas y 03_modelo.
 
 paquete: edad_cerebral
-version_modelo: edad-cerebral-0.1.0
-archivo_modelo: edad_cerebral_v0.1.0.pkl
+version_modelo: edad-cerebral-0.2.0
+archivo_modelo: edad_cerebral_v0.2.0.pkl
 
 # Los datos de entrenamiento viajan DENTRO del paquete, como en el Taller 5.
 # Son las dos tablas de características del notebook 02 y la partición del 01.

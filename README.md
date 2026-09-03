@@ -18,8 +18,9 @@ Diego Charry Cárdenas · Juan Camilo Martínez Vélez · Juan Sebastián Casas 
 
 ## Qué hace
 
-- Recibe una polisomnografía (`.edf`, o `.zip` con el par PSG + hipnograma,
-  hasta 600 MB) desde un tablero web.
+- Recibe una polisomnografía (`.zip` con el par PSG + hipnograma, hasta 600 MB)
+  desde un tablero web. El hipnograma anotado es obligatorio: el modelo se entrenó
+  con etapas anotadas por expertos.
 - **Detecta automáticamente la edad y el sexo** del sujeto desde el encabezado
   EDF (también dentro del .zip); la edad manual es opcional y prevalece si se
   ingresa.
@@ -164,7 +165,7 @@ TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
 curl -s http://localhost:8000/api/v1/records -H "Authorization: Bearer $TOKEN"
 
 # analizar un archivo (la edad se detecta del encabezado; -F chronological_age=NN para fijarla)
-curl -s -X POST http://localhost:8000/api/v1/records/analyze \
+curl -s -X POST http://localhost:8000/api/v1/predict \
   -H "Authorization: Bearer $TOKEN" -F "file=@mi_registro.zip"
 
 # borrar un registro

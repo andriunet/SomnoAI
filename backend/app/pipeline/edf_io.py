@@ -64,11 +64,16 @@ def load_raw(psg_path: str):
     except Exception as e:
         raise InvalidFile(f"No se pudo leer el EDF: {e}") from e
     n_channels = len(raw.ch_names)
-    if config.EEG_CHANNEL not in raw.ch_names:
+    faltan = [c for c in config.EEG_CHANNELS_MODELO if c not in raw.ch_names]
+    if faltan:
         raise InvalidFile(
-            f"El archivo no contiene el canal «{config.EEG_CHANNEL}» "
-            f"(canales presentes: {', '.join(raw.ch_names[:8])}…). "
-            "SomnoAI analiza polisomnografías con la convención de Sleep-EDFx.")
+            f"El archivo no contiene {'el canal' if len(faltan) == 1 else 'los canales'} "
+            f"«{'», «'.join(faltan)}» (canales presentes: {', '.join(raw.ch_names[:8])}…). "
+            "El modelo de edad cerebral necesita los dos canales de EEG "
+            f"({', '.join(config.EEG_CHANNELS_MODELO)}); SomnoAI analiza polisomnografías "
+            "con la convención de Sleep-EDFx.")
+    # Los paneles del tablero y el visor trabajan sobre un solo canal; el segundo
+    # lo lee el paquete del modelo por su cuenta, desde el archivo.
     raw.pick([config.EEG_CHANNEL])
     raw.load_data(verbose="ERROR")
     return raw, n_channels

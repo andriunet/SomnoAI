@@ -13,15 +13,16 @@ class ArchivoInvalido(ValueError):
     """El EDF no sirve para este modelo. El mensaje explica por qué."""
 
 
-def cargar_noche(psg_path: str, hyp_path: str):
-    """→ (raw, fs, épocas de 30 s con su etapa). Requiere hipnograma."""
+def cargar_raw(psg_path: str):
+    """→ (raw, fs, duración en s). Valida que estén los dos canales de EEG."""
     import mne
     mne.set_log_level("ERROR")
 
     m = config.modelo
-    raw = mne.io.read_raw_edf(psg_path, preload=False)
-    fs = raw.info["sfreq"]
-    duracion = raw.n_times / fs
+    try:
+        raw = mne.io.read_raw_edf(psg_path, preload=False)
+    except Exception as e:
+        raise ArchivoInvalido(f"No se pudo leer el EDF: {e}") from e
 
     faltan = [c for c, _ in m.canales if c not in raw.ch_names]
     if faltan:
@@ -30,14 +31,49 @@ def cargar_noche(psg_path: str, hyp_path: str):
             f"dos canales de EEG ({', '.join(c for c, _ in m.canales)}); el archivo trae: "
             f"{', '.join(raw.ch_names)}.")
 
+    fs = raw.info["sfreq"]
+    return raw, fs, raw.n_times / fs
+
+
+def epocas_desde_hipnograma(hyp_path: str, duracion_s: float) -> pd.DataFrame:
+    """Anotaciones del EDF+ del hipnograma → una fila por época de 30 s."""
+    import mne
+    mne.set_log_level("ERROR")
+
+    m = config.modelo
     ann = mne.read_annotations(hyp_path)
     epocas = [{"inicio_s": o + m.epoca_s * k, "stage": m.etapas.get(d, "?")}
               for o, dur, d in zip(ann.onset, ann.duration, ann.description)
               for k in range(int(dur // m.epoca_s))
-              if o + m.epoca_s * k + m.epoca_s <= duracion]   # descarta lo que no tiene señal
+              if o + m.epoca_s * k + m.epoca_s <= duracion_s]  # descarta lo que no tiene señal
     if not epocas:
         raise ArchivoInvalido("El hipnograma no cubre ninguna época con señal.")
-    return raw, fs, pd.DataFrame(epocas)
+    return pd.DataFrame(epocas)
+
+
+def epocas_desde_etiquetas(etiquetas, duracion_s: float) -> pd.DataFrame:
+    """Etapas ya calculadas (p. ej. por un estadificador automático) → épocas.
+
+    Cada elemento es la etapa de una época consecutiva de 30 s desde el inicio del
+    registro, con las etiquetas de config.yml: W, N1, N2, N3, REM, M o '?'.
+
+    Aviso: el modelo se entrenó con hipnogramas anotados por expertos. Con etapas
+    estimadas automáticamente las etiquetas no son las que vio, y el error real
+    será mayor que el 10,43 del reporte. Quien llame debería dejar constancia.
+    """
+    m = config.modelo
+    filas = [{"inicio_s": i * m.epoca_s, "stage": str(e)}
+             for i, e in enumerate(etiquetas)
+             if (i + 1) * m.epoca_s <= duracion_s]
+    if not filas:
+        raise ArchivoInvalido("Las etapas recibidas no cubren ninguna época con señal.")
+    return pd.DataFrame(filas)
+
+
+def cargar_noche(psg_path: str, hyp_path: str):
+    """→ (raw, fs, épocas). Atajo para el caso normal: PSG + hipnograma anotado."""
+    raw, fs, duracion = cargar_raw(psg_path)
+    return raw, fs, epocas_desde_hipnograma(hyp_path, duracion)
 
 
 def recortar(epocas: pd.DataFrame) -> pd.DataFrame:

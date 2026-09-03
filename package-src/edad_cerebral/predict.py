@@ -15,9 +15,11 @@ import typing as t
 from edad_cerebral import __version__ as _version
 from edad_cerebral.config.core import config
 from edad_cerebral.processing.data_manager import load_pipeline
-from edad_cerebral.processing.edf import (  # noqa: F401  (se reexporta: la API la captura)
+from edad_cerebral.processing.edf import (  # noqa: F401  (se reexportan: la API las usa)
     ArchivoInvalido,
-    cargar_noche,
+    cargar_raw,
+    epocas_desde_etiquetas,
+    epocas_desde_hipnograma,
     psds_de_la_noche,
     recortar,
 )
@@ -34,13 +36,24 @@ def _pipeline():
     return _pipe
 
 
-def extraer_caracteristicas(psg_path: str, hyp_path: str) -> t.Dict[str, float]:
-    """EDF + hipnograma → las 32 columnas que espera el modelo.
+def extraer_caracteristicas(psg_path: str, hyp_path: str | None = None,
+                            etapas=None) -> t.Dict[str, float]:
+    """EDF + etapas → las 32 columnas que espera el modelo.
+
+    Las etapas llegan de una de dos formas, y hay que dar exactamente una:
+      - `hyp_path`: el EDF+ de anotaciones de Sleep-EDFx (lo normal)
+      - `etapas`  : una etiqueta por época de 30 s, ya calculada por quien llama
+                    (p. ej. un estadificador automático)
 
     Reproduce el notebook 02 para las columnas `mix_*` de los dos canales y las 8
     de arquitectura. No calcula las curvas por fase: el modelo no las usa.
     """
-    raw, fs, epocas = cargar_noche(psg_path, hyp_path)
+    if (hyp_path is None) == (etapas is None):
+        raise ValueError("Dé exactamente uno: hyp_path o etapas.")
+
+    raw, fs, duracion = cargar_raw(psg_path)
+    epocas = (epocas_desde_hipnograma(hyp_path, duracion) if hyp_path is not None
+              else epocas_desde_etiquetas(etapas, duracion))
     noche = recortar(epocas)
 
     fila: t.Dict[str, float] = {}
@@ -64,9 +77,9 @@ def make_prediction(*, input_data: t.Union[t.Dict[str, t.Any], "object"]) -> dic
     return resultado
 
 
-def predecir_desde_edf(psg_path: str, hyp_path: str) -> dict:
+def predecir_desde_edf(psg_path: str, hyp_path: str | None = None, etapas=None) -> dict:
     """El camino completo, que es el que usa la API."""
-    caracteristicas = extraer_caracteristicas(psg_path, hyp_path)
+    caracteristicas = extraer_caracteristicas(psg_path, hyp_path, etapas)
     r = make_prediction(input_data=caracteristicas)
     if r["errors"]:
         raise ArchivoInvalido("; ".join(r["errors"]))

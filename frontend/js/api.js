@@ -96,14 +96,14 @@
       const fd = new FormData();
       fd.append("file", file);
       if (age != null) fd.append("chronological_age", String(age)); // opcional: el backend la detecta del EDF
-      return http("/records/analyze", {
+      return http("/predict", {
         method: "POST", body: fd, isForm: true, timeoutMs: CFG.analyzeTimeoutMs
       });
     },
 
     analyzeDemo(demoId) {
       if (useMock()) return MaiaMock.analyzeDemo(demoId);
-      return http("/records/analyze-demo", {
+      return http("/predict-demo", {
         method: "POST", body: { demo_id: demoId }, timeoutMs: CFG.analyzeTimeoutMs
       });
     },

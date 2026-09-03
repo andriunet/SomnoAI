@@ -54,7 +54,7 @@ PY
 
   echo "  analizando (puede tardar minutos)…"
   RESP="$WORK/resp.json"
-  if ! curl -sS -X POST "$API/records/analyze" \
+  if ! curl -sS -X POST "$API/predict" \
         -H "Authorization: Bearer $TOKEN" -F "file=@$ZIP" -o "$RESP"; then
     echo "  FALLÓ la petición a la API"
     rm -f "$WORK/$PSG" "$WORK/$HYP" "$ZIP"
