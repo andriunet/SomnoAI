@@ -1,0 +1,16 @@
+include *.txt
+include *.md
+
+include edad_cerebral/VERSION
+include edad_cerebral/config.yml
+include edad_cerebral/trained/*.pkl
+include edad_cerebral/datasets/*.csv
+include edad_cerebral/datasets/*.json
+
+include ./requirements/requirements.txt
+include ./requirements/test_requirements.txt
+exclude *.log
+exclude *.cfg
+
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

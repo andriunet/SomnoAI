@@ -1,0 +1,22 @@
+[build-system]
+requires = [
+    "setuptools>=68",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-rfEX --strict-markers"
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test"]
+testpaths = ["tests"]
+xfail_strict = true
+
+[tool.black]
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+lines_between_sections = 1

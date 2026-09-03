@@ -1,0 +1,92 @@
+# Configuración del paquete edad_cerebral.
+#
+# Todo lo que define el modelo vive aquí, no repartido por el código: si mañana
+# se reentrena con otra rejilla o con otras columnas, se cambia este archivo.
+# Los valores salen de los notebooks 02_caracteristicas y 03_modelo.
+
+paquete: edad_cerebral
+version_modelo: edad-cerebral-0.1.0
+archivo_modelo: edad_cerebral_v0.1.0.pkl
+
+# Los datos de entrenamiento viajan DENTRO del paquete, como en el Taller 5.
+# Son las dos tablas de características del notebook 02 y la partición del 01.
+# Así `tox run -e train` reconstruye el artefacto sin depender de rutas externas
+# ni de los 8 GB de EDF.
+csv_fpz: caracteristicas_noche_FpzCz.csv
+csv_pz: caracteristicas_noche_PzOz.csv
+particion: subject_split_seed42.json
+
+# ── extracción de la señal (notebook 02) ────────────────────────────
+epoca_s: 30
+rango_hz: [0.5, 30]
+nperseg_epocas: 4          # welch usa nperseg = 4 * fs
+escala_psd: 1.0e12         # V²/Hz → µV²/Hz
+
+bandas:
+  delta: [0.5, 4]
+  theta: [4, 8]
+  alpha: [8, 12]
+  sigma: [12, 16]
+  beta:  [16, 30]
+
+# El modelo del experimento C usa los dos canales de EEG. Ambos deben estar
+# presentes en el EDF: sin uno de ellos faltan 12 de las 32 columnas.
+canales:
+  - [EEG Fpz-Cz, FpzCz]
+  - [EEG Pz-Oz, PzOz]
+
+# Un EEG de sueño en µV vive en este rango. Fuera de él, lo más probable es que
+# el EDF declare las unidades de otra forma y las columnas abs_* (que son
+# log10 de potencia) saldrían desplazadas sin dar ningún error.
+amplitud_uv_esperada: [1.0, 500.0]
+
+etapas:
+  "Sleep stage W": W
+  "Sleep stage 1": N1
+  "Sleep stage 2": N2
+  "Sleep stage 3": N3
+  "Sleep stage 4": N3
+  "Sleep stage R": REM
+  "Movement time": M
+  "Sleep stage ?": "?"
+etapas_dormido: [N1, N2, N3, REM]
+
+# ── el modelo (notebook 03, experimento C) ──────────────────────────
+alpha: 3.1622776601683795   # 10^0.5 · de np.logspace(-2, 4, 13)
+lam: 0.01
+
+# MAE de validación cruzada sobre los 62 sujetos de desarrollo. Es la cifra
+# defendible: el MAE de test (9,15) está sesgado a la baja porque son 16
+# sujetos consultados muchas veces durante el proyecto.
+mae_validacion: 10.43
+nivel_intervalo: 0.90
+
+# Referencias que debe reproducir el entrenamiento antes de guardar nada.
+metricas_esperadas:
+  mae_train: 7.48
+  mae_validacion: 10.43
+  mae_test: 9.15
+
+espectrales:
+  - potencia_total_log
+  - abs_delta
+  - abs_theta
+  - abs_alpha
+  - abs_sigma
+  - abs_beta
+  - rel_delta
+  - rel_theta
+  - rel_alpha
+  - rel_sigma
+  - rel_beta
+  - sef95
+
+arquitectura:
+  - horas_dormidas
+  - eficiencia
+  - minutos_despierto
+  - minutos_hasta_rem
+  - pct_sueno_en_N1
+  - pct_sueno_en_N2
+  - pct_sueno_en_N3
+  - pct_sueno_en_REM
