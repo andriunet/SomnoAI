@@ -137,8 +137,11 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     nrem_idx = [int(i) for i in np.where((st_win >= 1) & (st_win <= 3))[0]]
     if len(nrem_idx) < 10:
         raise NoSleepDetected("Muy pocas épocas NREM utilizables para calcular el espectro.")
-    sampled = sorted({nrem_idx[int(k)] for k in np.linspace(0, len(nrem_idx) - 1, config.SPECTRUM_WINDOWS)})
-    f_raw, psd_raw = _mean_psd(sig, sampled, sfreq, epoch_samples)
+    # TODAS las épocas NREM, no una muestra. Con 30 de ~500 el pico de husos
+    # (que es un máximo sobre una curva ruidosa) salía un 7 % alto de media, y
+    # sobre todo saltaba: el mismo registro daba entre 5 % y 54 % de déficit
+    # según qué épocas tocaran. Cuesta un par de segundos más.
+    f_raw, psd_raw = _mean_psd(sig, nrem_idx, sfreq, epoch_samples)
 
     grid = np.round(np.arange(config.FREQ_GRID_START, config.FREQ_GRID_STOP + 1e-9,
                               config.FREQ_GRID_STEP), 1)
@@ -222,9 +225,15 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
             "norm_band_low": _r(nrm["norm_band_low"]),
             "norm_band_high": _r(nrm["norm_band_high"]),
             "spindle_band": list(config.SPINDLE_BAND),
+            "spindle_percentile": nrm["spindle_percentile"],
             "spindle_deficit_pct": nrm["spindle_deficit_pct"],
             "spindle_age_corr_r": nrm["spindle_age_corr_r"],
             "marker_freq": nrm["marker_freq"],
+            # De cuántos sujetos y de qué edades salió la referencia: el pie del
+            # panel lo declara, para que el porcentaje se pueda juzgar.
+            "norm_n_subjects": nrm["norm_n_subjects"],
+            "norm_age_min": nrm["norm_age_min"],
+            "norm_age_max": nrm["norm_age_max"],
         },
         "night": {
             "start_clock_s": start_clock_s,
@@ -253,7 +262,7 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
                 "sleep_window_s": window_s,
                 "epochs_in_window": n_win,
                 "nrem_epochs_used": len(nrem_idx),
-                "spectrum_windows": len(sampled),
+                "spectrum_windows": len(nrem_idx),
                 "epochs_discarded": n_win - len(nrem_idx),
                 "unscored_pct": round(100.0 * unscored_ct / max(n_win, 1), 1),
                 "wake_trimmed_s": int(max(total_s - window_s, 0)),

@@ -20,7 +20,6 @@ EEG_CHANNEL = "EEG Fpz-Cz"          # el que se muestra en el visor y alimenta l
 EEG_CHANNELS_MODELO = ("EEG Fpz-Cz", "EEG Pz-Oz")
 EPOCH_S = 30
 MARGIN_EPOCHS = 60            # 30 min de margen alrededor del sueño (criterio Entrega 1)
-SPECTRUM_WINDOWS = 30         # épocas NREM muestreadas para el espectro del panel
 FREQ_GRID_START, FREQ_GRID_STOP, FREQ_GRID_STEP = 0.5, 25.0, 0.2
 SPINDLE_BAND = (12.0, 16.0)
 

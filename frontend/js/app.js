@@ -261,12 +261,28 @@
     $("legNorm").textContent = `Norma a los ${d.chronological_age} años`;
     C.renderSpectrum($("c-spectrum"), d);
     const sp = d.spectrum;
+    const fmt = v => v.toFixed(2).replace(".", ",").replace("-", "−");
+    // El pie declara de cuántos sujetos y de qué edades salió la referencia: sin
+    // eso, un porcentaje sobre una norma invisible no se puede juzgar.
+    const pc = sp.spindle_percentile;
+    const ref = sp.norm_n_subjects
+      ? `${sp.norm_n_subjects} sujetos del entrenamiento de ${sp.norm_age_min} a ${sp.norm_age_max} años`
+      : "los sujetos de edad similar";
+    // Si el grupo de referencia queda lejos de la edad real, hay que decirlo: el
+    // dataset no tiene sujetos en los 40, así que alguien de 45 se compara con
+    // gente de 50 y pico. El pie lo declara en vez de disimularlo.
+    const edad = d.chronological_age;
+    const lejos = sp.norm_age_min > edad + 6 || sp.norm_age_max < edad - 6;
+    const donde = pc < 10 ? "queda por <b>debajo</b> de la banda gris"
+                : pc > 90 ? "queda por <b>encima</b> de la banda gris"
+                : "queda <b>dentro</b> de la banda gris";
     $("spectrumMini").innerHTML =
-      `Los <b>husos de sueño (${sp.spindle_band[0]}–${sp.spindle_band[1]} Hz)</b> se pierden con la edad: el análisis ` +
-      `del equipo encontró una correlación de <b>r = ${sp.spindle_age_corr_r.toFixed(2).replace(".", ",").replace("-", "−")}</b> ` +
-      `entre su potencia y la edad, sobre las 153 noches del subconjunto Sleep Cassette. Este sujeto tiene un ` +
-      `<b>${Math.abs(Math.round(sp.spindle_deficit_pct))} % ${sp.spindle_deficit_pct >= 0 ? "menos" : "más"}</b> de husos ` +
-      `de los que le corresponden.`;
+      `Los <b>husos de sueño (${sp.spindle_band[0]}–${sp.spindle_band[1]} Hz)</b> son ráfagas de actividad del sueño ` +
+      `profundo ligadas a la consolidación de la memoria, y se van apagando con la edad. Por eso la comparación es ` +
+      `contra personas de edad parecida y no contra un valor fijo: este sujeto tiene ` +
+      `<b>${pc < 50 ? "menos" : "más"} husos que el ${pc < 50 ? 100 - pc : pc} %</b> de ${ref}, así que ${donde}.` +
+      (lejos ? ` <b>Ojo:</b> no hay sujetos de ${edad} años en el conjunto de entrenamiento, ` +
+               `así que la referencia son los de edad más cercana disponible.` : "");
 
     // 4 · señal
     $("stgSource").textContent = d.staging_source === "annotated"

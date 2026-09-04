@@ -36,6 +36,7 @@ class AppConfig(BaseModel):
     csv_fpz: str
     csv_pz: str
     particion: str
+    csv_espectros: str
 
 
 class ModeloConfig(BaseModel):

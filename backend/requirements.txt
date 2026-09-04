@@ -4,7 +4,7 @@
 # artefacto entrenado, su preprocesamiento y sus propias dependencias fijadas
 # (numpy, scipy, pandas, scikit-learn, mne). Actualizar el modelo = reconstruir
 # el wheel, cambiar esta línea y reconstruir la imagen. Sin tocar código.
-./model-pkg/edad_cerebral-0.2.0-py3-none-any.whl
+./model-pkg/edad_cerebral-0.3.0-py3-none-any.whl
 
 # ── API ──────────────────────────────────────────────
 fastapi==0.141.1            # framework de la API (contrato en docs/API_CONTRACT.md)
