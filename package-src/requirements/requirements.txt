@@ -1,0 +1,13 @@
+# Las versiones son las del entorno de servicio (el contenedor de la API), no
+# las del portátil donde se explora. Motivo: los CSV de características se
+# calcularon con scipy y el escalador del modelo se ajustó sobre esos números.
+# Extraer en producción con otra versión de scipy movería las características
+# sin lanzar ningún error, y la predicción saldría corrida.
+numpy==1.26.4
+scipy==1.17.1
+pandas==2.2.2
+scikit-learn==1.5.1
+joblib==1.4.2
+mne==1.12.1
+PyYAML>=6.0,<7.0
+pydantic>=2.0,<3.0        # valida config.yml (config/core.py)

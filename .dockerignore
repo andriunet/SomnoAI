@@ -1,0 +1,15 @@
+# El contexto de construcción es la raíz del repositorio (ver backend/Dockerfile),
+# así que hay que dejar fuera todo lo que la imagen de la API no necesita.
+.git
+.gitignore
+docs
+frontend
+ml
+scripts
+package-src
+backend/.venv
+backend/data
+backend/model_artifacts
+**/__pycache__
+*.pyc
+.DS_Store

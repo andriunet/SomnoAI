@@ -16,3 +16,10 @@ ml/mlserver/
 # temporales
 *.part
 frontend/_test*.zip
+
+# artefactos de construcción del paquete (el .whl publicado vive en model-pkg/)
+package-src/build/
+package-src/dist/
+package-src/*.egg-info/
+package-src/.tox/
+package-src/.pytest_cache/

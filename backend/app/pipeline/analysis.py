@@ -72,16 +72,21 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     total_s = raw.n_times / sfreq
 
     # ── hipnograma ──
-    if hyp_path:
-        stages_full = staging.from_annotations(hyp_path, total_s)
-        staging_source = "annotated"
-    else:
-        if not staging.yasa_available():
-            raise edf_io.InvalidFile(
-                "El archivo no incluye hipnograma y la estadificación automática no está "
-                "disponible en el servidor. Cargue un .zip con el par PSG + hipnograma.")
-        stages_full = staging.auto_yasa(raw)
-        staging_source = "auto"
+    # El modelo EXIGE hipnograma anotado. Se midió: sobre SC4001E0, con anotación da
+    # 24,8 años y con etapas estimadas por YASA da 46,2 — 21 años de diferencia, el
+    # doble del MAE del modelo. La causa es que %N3, eficiencia y minutos_despierto
+    # son features que entran directas al modelo, y las de un estadificador automático
+    # no son las que vio al entrenar. Un número plausible y equivocado es peor que un
+    # error, así que se rechaza.
+    if not hyp_path:
+        raise edf_io.InvalidFile(
+            "Este registro no incluye hipnograma. El modelo de edad cerebral se entrenó "
+            "con hipnogramas anotados por expertos y sus características de arquitectura "
+            "del sueño dependen de ellos, así que estimarlos automáticamente daría un "
+            "resultado poco fiable. Cargue un .zip con el par PSG + hipnograma "
+            "(…-PSG.edf y …-Hypnogram.edf).")
+    stages_full = staging.from_annotations(hyp_path, total_s)
+    staging_source = "annotated"
 
     sleep_idx = np.where((stages_full >= 1) & (stages_full <= 4))[0]
     if len(sleep_idx) < 20:  # < 10 min de sueño
@@ -132,8 +137,11 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     nrem_idx = [int(i) for i in np.where((st_win >= 1) & (st_win <= 3))[0]]
     if len(nrem_idx) < 10:
         raise NoSleepDetected("Muy pocas épocas NREM utilizables para calcular el espectro.")
-    sampled = sorted({nrem_idx[int(k)] for k in np.linspace(0, len(nrem_idx) - 1, config.SPECTRUM_WINDOWS)})
-    f_raw, psd_raw = _mean_psd(sig, sampled, sfreq, epoch_samples)
+    # TODAS las épocas NREM, no una muestra. Con 30 de ~500 el pico de husos
+    # (que es un máximo sobre una curva ruidosa) salía un 7 % alto de media, y
+    # sobre todo saltaba: el mismo registro daba entre 5 % y 54 % de déficit
+    # según qué épocas tocaran. Cuesta un par de segundos más.
+    f_raw, psd_raw = _mean_psd(sig, nrem_idx, sfreq, epoch_samples)
 
     grid = np.round(np.arange(config.FREQ_GRID_START, config.FREQ_GRID_STOP + 1e-9,
                               config.FREQ_GRID_STEP), 1)
@@ -172,7 +180,10 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
     features["spindle_amp"] = nrm["subject_spindle_amp"]
 
     # ── modelo ──
-    brain_age, meta = predictor.predict(features)
+    # El paquete edad_cerebral extrae sus propias 32 características del archivo:
+    # tienen que ser exactamente las del entrenamiento, y las de arriba son las
+    # que alimentan los paneles del tablero, que son otras.
+    brain_age, meta, model_features = predictor.predict(psg_path, hyp_path)
     brain_age = round(float(brain_age), 1)
     bai = round(brain_age - chronological_age, 1)
     err = meta["typical_error"]
@@ -214,9 +225,15 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
             "norm_band_low": _r(nrm["norm_band_low"]),
             "norm_band_high": _r(nrm["norm_band_high"]),
             "spindle_band": list(config.SPINDLE_BAND),
+            "spindle_percentile": nrm["spindle_percentile"],
             "spindle_deficit_pct": nrm["spindle_deficit_pct"],
             "spindle_age_corr_r": nrm["spindle_age_corr_r"],
             "marker_freq": nrm["marker_freq"],
+            # De cuántos sujetos y de qué edades salió la referencia: el pie del
+            # panel lo declara, para que el porcentaje se pueda juzgar.
+            "norm_n_subjects": nrm["norm_n_subjects"],
+            "norm_age_min": nrm["norm_age_min"],
+            "norm_age_max": nrm["norm_age_max"],
         },
         "night": {
             "start_clock_s": start_clock_s,
@@ -245,13 +262,16 @@ def run_analysis(psg_path: str, hyp_path: str | None, *, file_name: str, size_mb
                 "sleep_window_s": window_s,
                 "epochs_in_window": n_win,
                 "nrem_epochs_used": len(nrem_idx),
-                "spectrum_windows": len(sampled),
+                "spectrum_windows": len(nrem_idx),
                 "epochs_discarded": n_win - len(nrem_idx),
                 "unscored_pct": round(100.0 * unscored_ct / max(n_win, 1), 1),
                 "wake_trimmed_s": int(max(total_s - window_s, 0)),
             },
         },
-        "features": features,  # se expone para trazabilidad / depuración del equipo
+        # Las que entraron al modelo (las 32 del paquete), no las de los paneles:
+        # si alguien audita una predicción, estas son las que la explican.
+        "features": model_features,
+        "features_panel": features,   # las del tablero (espectro, husos, arquitectura)
     }
     return summary, detail, sig, sfreq
 

@@ -16,15 +16,17 @@
 
 services:
   api:
-    build: ./backend
+    # El contexto es la raíz: requirements.txt instala el wheel de model-pkg/,
+    # que quedaría fuera si el contexto fuese ./backend.
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: maia-api
     ports:
       - "8000:8000"
     volumes:
       # EDFs demo + base de datos + señales derivadas (persisten en el host)
       - ./backend/data:/app/data
-      # el equipo de modelado deja aquí su model.joblib sin reconstruir la imagen
-      - ./backend/model_artifacts:/app/model_artifacts
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
@@ -38,7 +40,7 @@ services:
     image: nginx:alpine
     container_name: maia-front
     ports:
-      - "8080:80"
+      - "8050:80"   # 8050: el puerto abierto en el security group de la EC2
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
     depends_on:

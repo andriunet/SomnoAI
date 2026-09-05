@@ -1,0 +1,15 @@
+SC4011E0-PSG.edf SC4011EH-Hypnogram.edf 33
+SC4031E0-PSG.edf SC4031EC-Hypnogram.edf 26
+SC4041E0-PSG.edf SC4041EC-Hypnogram.edf 34
+SC4051E0-PSG.edf SC4051EC-Hypnogram.edf 28
+SC4081E0-PSG.edf SC4081EC-Hypnogram.edf 25
+SC4201E0-PSG.edf SC4201EC-Hypnogram.edf 51
+SC4211E0-PSG.edf SC4211EC-Hypnogram.edf 51
+SC4221E0-PSG.edf SC4221EJ-Hypnogram.edf 56
+SC4331F0-PSG.edf SC4331FV-Hypnogram.edf 60
+SC4401E0-PSG.edf SC4401EC-Hypnogram.edf 67
+SC4431E0-PSG.edf SC4431EM-Hypnogram.edf 73
+SC4441E0-PSG.edf SC4441EC-Hypnogram.edf 74
+SC4601E0-PSG.edf SC4601EC-Hypnogram.edf 89
+SC4621E0-PSG.edf SC4621EV-Hypnogram.edf 95
+SC4641E0-PSG.edf SC4641EP-Hypnogram.edf 85

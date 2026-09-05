@@ -165,13 +165,13 @@ La señal derivada en disco solo se borra si ningún otro registro la comparte
 
 ## 3 · Análisis
 
-### POST `/records/analyze`
+### POST `/predict`
 
 `multipart/form-data`:
 
 | campo | tipo | reglas |
 |---|---|---|
-| `file` | archivo | `.edf` o `.zip` (PSG + hipnograma), máx. **600 MB** |
+| `file` | archivo | **`.zip` con el par PSG + hipnograma**, máx. **600 MB**. Un `.edf` suelto se rechaza con `422 invalid_file`: el modelo se entrenó con hipnogramas anotados y sus características de arquitectura del sueño dependen de ellos. El registro debe traer **los dos canales de EEG** (`EEG Fpz-Cz` y `EEG Pz-Oz`); si falta uno, `422 invalid_file`. |
 | `chronological_age` | entero, **opcional** | 1–120. **No entra al modelo**: solo para el BAI. Si no viene, la API la **detecta del encabezado EDF** (campo de paciente, formato Sleep-EDFx «X F X Female_33yr» — también dentro del .zip). La manual manda sobre la detectada. Si tampoco está en el encabezado → `422 age_required`. |
 
 El resumen de cada registro incluye `age_source`: `"manual" | "edf-header" | "dataset-index"`
@@ -189,7 +189,7 @@ Puede tardar minutos: el front espera hasta 10 min (síncrono está bien para el
 explicando qué faltó), `422 invalid_age`, `422 age_required` (sin edad manual ni
 edad en el encabezado).
 
-### POST `/records/analyze-demo`
+### POST `/predict-demo`
 
 Analiza una de las noches del dataset precargadas en el servidor (idealmente
 precomputadas para que la demo responda rápido).

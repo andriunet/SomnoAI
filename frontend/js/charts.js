@@ -184,15 +184,21 @@
     line(sp.subject, "--s1", 2.4);
     // marcador de divergencia en la banda de husos
     const mi = sp.freqs.reduce((best, f, i) => Math.abs(f - sp.marker_freq) < Math.abs(sp.freqs[best] - sp.marker_freq) ? i : best, 0);
-    const deficit = sp.spindle_deficit_pct;
-    const mcol = deficit >= 0 ? "--older" : "--good";
+    // El percentil dentro del grupo de referencia. Por debajo de 10 o por encima
+    // de 90 el sujeto se sale de la banda gris, que es justo p10-p90.
+    const pc = sp.spindle_percentile;
+    const mcol = pc < 50 ? "--older" : "--good";
     s.appendChild(S("line", { x1: x(sp.freqs[mi]), x2: x(sp.freqs[mi]), y1: y(sp.subject[mi]), y2: y(sp.norm[mi]),
       stroke: CV(mcol), "stroke-width": 2.2 }));
     s.appendChild(S("circle", { cx: x(sp.freqs[mi]), cy: y(sp.subject[mi]), r: 4.5, fill: CV(mcol),
       stroke: CV("--surface-1"), "stroke-width": 1.5 }));
     const lblX = Math.min(x(sp.freqs[mi]) + 46, W - R - 180);
+    // Se enuncia siempre el lado mayoritario: con el percentil 38, decir «más husos
+    // que el 38 %» es cierto pero lee como elogio, mientras la curva va por debajo
+    // de la gris. «Menos husos que el 62 %» dice lo mismo y coincide con lo que se ve.
+    const bajo = pc < 50;
     s.appendChild(T({ x: lblX, y: y(sp.norm[mi]) + 2, "class": "dlbl", fill: CV(mcol), "font-size": "12.5" },
-      `${Math.abs(Math.round(deficit))} % ${deficit >= 0 ? "menos" : "más"} de husos`));
+      `${bajo ? "menos" : "más"} husos que el ${bajo ? 100 - pc : pc} % de su edad`));
     s.appendChild(T({ x: L + pw / 2, y: H - 8, "text-anchor": "middle", "class": "axlbl" },
       "Frecuencia (Hz) · ondas lentas ← → ondas rápidas"));
     s.appendChild(T({ x: L - 44, y: Tp + ph / 2, "class": "axlbl", transform: `rotate(-90 ${L - 44} ${Tp + ph / 2})`,

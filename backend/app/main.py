@@ -90,10 +90,8 @@ async def http_exc(_, exc: HTTPException):
 @app.get("/api/v1/health")
 def health():
     """Sin auth: para el healthcheck de Docker Compose y monitoreo."""
-    from .model.predictor import _load_bundle
-    bundle = _load_bundle()
     return {"status": "ok", "records": db.count(),
-            "model": bundle["meta"]["version"] if bundle else "heuristic-v0 (provisional)"}
+            "model": predictor.active_version()}
 
 
 # ── auth ──────────────────────────────────────────────────────────────
@@ -143,8 +141,8 @@ def delete_record(record_id: str, _: str = Depends(auth)):
 
 
 # ── análisis ──────────────────────────────────────────────────────────
-@app.post("/api/v1/records/analyze")
-def analyze(file: UploadFile, chronological_age: int | None = Form(None), _: str = Depends(auth)):
+@app.post("/api/v1/predict")
+def predict(file: UploadFile, chronological_age: int | None = Form(None), _: str = Depends(auth)):
     if chronological_age is not None and not (1 <= chronological_age <= 120):
         raise _err(422, "invalid_age", "La edad cronológica debe estar entre 1 y 120 años.")
     name = Path(file.filename or "registro.edf").name
@@ -183,7 +181,7 @@ def analyze(file: UploadFile, chronological_age: int | None = Form(None), _: str
             chronological_age=age, sex=header["sex"], subject_code=None,
             predictor=predictor)
         summary["age_source"] = age_source
-    except edf_io.InvalidFile as e:
+    except (edf_io.InvalidFile, predictor.ArchivoInvalido) as e:
         raise _err(422, "invalid_file", str(e))
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -198,8 +196,8 @@ class DemoBody(BaseModel):
     demo_id: str
 
 
-@app.post("/api/v1/records/analyze-demo")
-def analyze_demo(body: DemoBody, _: str = Depends(auth)):
+@app.post("/api/v1/predict-demo")
+def predict_demo(body: DemoBody, _: str = Depends(auth)):
     if body.demo_id not in config.DEMOS:
         raise _err(404, "not_found", "Registro demo desconocido.")
     base = db.get_detail(f"demo-{body.demo_id}")

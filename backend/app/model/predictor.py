@@ -1,81 +1,57 @@
-"""Predictor de edad cerebral — punto de enchufe del modelo del equipo.
+"""Predictor de edad cerebral — la costura entre la API y el modelo empaquetado.
 
-CÓMO ENCHUFAR EL MODELO REAL (equipo de modelado):
-  Guardar en backend/model_artifacts/model.joblib un dict:
-      {
-        "model": <estimador sklearn ya entrenado, .predict(DataFrame)>,
-        "feature_names": [columnas en el orden esperado],
-        "meta": {
-          "version": "gbm-v1.0",          # aparece en la píldora del tablero
-          "typical_error": 8.3,           # semiancho del intervalo (años)
-          "interval_level": 0.90
-        }
-      }
-  Las features disponibles (nombres exactos) son las que produce
-  pipeline/analysis.py y quedan en detail["features"] de cada análisis:
-  bandas abs/rel por NREM y por estadio (nrem_delta_abs, n2_sigma_rel, …),
-  arquitectura (pct_n1, sleep_efficiency, waso_min, tst_min, rem_latency_min,
-  pct_n2, pct_n3, pct_rem) y spindle_amp.
-  ¡La edad cronológica NO es una feature! (regla del proyecto).
+El modelo NO vive aquí: viaja en el wheel `edad_cerebral`, que se instala como
+dependencia (primera línea de backend/requirements.txt) y trae dentro su
+artefacto entrenado y su propio preprocesamiento.
 
-Mientras no exista model.joblib se usa un HEURÍSTICO PROVISIONAL anclado en
-las correlaciones que el equipo midió en la Entrega 1 (%N1 r=+0.64,
-eficiencia r=−0.62, WASO r=+0.57, husos r=−0.50). Sirve para que el flujo
-completo corra con datos reales; NO es el modelo de la entrega.
+CÓMO ACTUALIZAR EL MODELO (equipo de modelado):
+  1. reentrenar y reconstruir el wheel con Experimentos/Sebastian/04_empaquetamiento.ipynb
+  2. dejar el .whl nuevo en model-pkg/
+  3. apuntar a él la primera línea de backend/requirements.txt
+  4. reconstruir la imagen
+  Sin tocar este archivo ni ningún otro del backend.
+
+El paquete recibe el ARCHIVO, no un vector de características: la extracción es
+parte del modelo (así lo pide el Taller 5) y tiene que ser exactamente la del
+entrenamiento. Por eso el EDF se lee dos veces por análisis — una el pipeline del
+tablero para lo que pinta, y otra el paquete para lo que predice. Es deliberado:
+mantiene separado lo que se muestra de lo que entra al modelo.
 """
 import logging
 
-from .. import config
+from edad_cerebral import __version__ as _version_paquete
+from edad_cerebral.predict import ArchivoInvalido, predecir_desde_edf  # noqa: F401
 
 log = logging.getLogger("maia.model")
 
-_BUNDLE = None
-_TRIED = False
+# El backend codifica las etapas como enteros (staging.py); el paquete usa las
+# etiquetas del hipnograma de Sleep-EDFx.
+_ETIQUETA = {0: "W", 1: "N1", 2: "N2", 3: "N3", 4: "REM", -1: "?"}
 
 
-def _load_bundle():
-    global _BUNDLE, _TRIED
-    if _TRIED:
-        return _BUNDLE
-    _TRIED = True
-    path = config.MODEL_DIR / "model.joblib"
-    if path.exists():
-        import joblib
-        _BUNDLE = joblib.load(path)
-        log.info("Modelo del equipo cargado: %s", _BUNDLE["meta"]["version"])
-    else:
-        log.warning("model_artifacts/model.joblib no existe → heurístico provisional")
-    return _BUNDLE
+def active_version() -> str:
+    """Versión del modelo que realmente está sirviendo (para /health)."""
+    return f"edad-cerebral-{_version_paquete}"
 
 
-def predict(features: dict) -> tuple[float, dict]:
-    """→ (edad_cerebral, meta). meta: version, typical_error, interval_level."""
-    bundle = _load_bundle()
-    if bundle is not None:
-        import pandas as pd
-        X = pd.DataFrame([[features.get(k, 0.0) for k in bundle["feature_names"]]],
-                         columns=bundle["feature_names"])
-        return float(bundle["model"].predict(X)[0]), dict(bundle["meta"])
-    return _heuristic(features), {
-        "version": "heuristic-v0 (provisional)",
-        "typical_error": 10.2,      # MAE del Ridge de la Entrega 1
-        "interval_level": 0.90,
+def predict(psg_path: str, hyp_path: str | None = None, stages=None) -> tuple[float, dict, dict]:
+    """→ (edad_cerebral, meta, caracteristicas).
+
+    `stages` solo se usa cuando no hay hipnograma anotado: son las etapas que
+    estimó el estadificador automático, y hay que pasarlas porque el paquete no
+    sabe estadificar. El resultado en ese caso es menos fiable — el modelo se
+    entrenó con hipnogramas anotados por expertos.
+    """
+    etapas = None
+    if hyp_path is None:
+        if stages is None:
+            raise ValueError("Sin hipnograma hay que pasar las etapas estimadas.")
+        etapas = [_ETIQUETA.get(int(s), "?") for s in stages]
+
+    r = predecir_desde_edf(psg_path, hyp_path, etapas)
+    meta = {
+        "version": r["version"],
+        "typical_error": r["error_tipico"],
+        "interval_level": r["nivel_intervalo"],
     }
-
-
-def _heuristic(f: dict) -> float:
-    """Provisional: cada marcador de la Entrega 1 se mapea a un puntaje de
-    envejecimiento acotado en [0,1] y la edad es una mezcla ponderada. Los
-    pesos siguen las correlaciones medidas (%N1 +0.64, eficiencia −0.62,
-    WASO +0.57, husos −0.50, N3 −0.42)."""
-    clip = lambda v: max(0.0, min(1.0, v))
-    s_spindle = clip(1.0 - f.get("spindle_amp", 1.2) / 2.0)     # husos: marcador dominante
-    s_n3 = clip((0.20 - f.get("pct_n3", 0.12)) / 0.20)          # sueño profundo
-    s_delta = clip((0.93 - f.get("nrem_delta_rel", 0.90)) / 0.10)
-    s_n1 = clip((f.get("pct_n1", 0.08) - 0.05) / 0.15)
-    s_frag = 0.5 * clip((0.95 - f.get("sleep_efficiency", 0.85)) / 0.30) \
-           + 0.5 * clip((f.get("waso_min", 40.0) / 60.0) / 4.0)  # fragmentación
-
-    score = (0.35 * s_spindle + 0.25 * s_n3 + 0.15 * s_delta
-             + 0.15 * s_n1 + 0.10 * s_frag)
-    return max(20.0, min(100.0, 27.0 + 58.0 * score))
+    return r["edad_cerebral"], meta, r["caracteristicas"]
