@@ -13,7 +13,7 @@ umbral).
 
 Uso:
     # contra el tracking server del equipo (si está arriba)
-    MLFLOW_TRACKING_URI=http://13.223.193.36:8050 \
+    MLFLOW_TRACKING_URI=http://3.236.12.125:8050 \
         ./backend/.venv/bin/python ml/tune_gb.py
 
     # local, si el EC2 no responde
