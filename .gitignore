@@ -21,3 +21,4 @@ ml/mlserver/
 # temporales
 *.part
 frontend/_test*.zip
+docs/muestra-para-manual/
