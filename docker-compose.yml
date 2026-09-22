@@ -1,7 +1,7 @@
 # MAIA / SomnoAI — despliegue local con Docker (requisito de la Entrega 2)
 #
 #   docker compose up --build
-#   → tablero:  http://localhost:8080
+#   → tablero:  http://localhost:8050
 #   → API:      http://localhost:8000  (docs interactivas en /docs)
 #
 # Requisitos previos:
