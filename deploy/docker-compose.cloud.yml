@@ -1,0 +1,17 @@
+# Despliegue en una máquina de la nube con un solo puerto abierto.
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.cloud.yml up -d --build
+#
+# El tablero y la API se sirven por el mismo puerto (8050): nginx entrega el
+# front y reenvía /api/ y /docs al contenedor de la API. Así el security group
+# solo necesita una regla, y el navegador nunca hace peticiones a otro origen.
+#
+# Con esta configuración, frontend/js/config.js debe apuntar al mismo origen:
+#     apiBase: location.origin + "/api/v1"
+services:
+  api:
+    ports: !override []      # la API deja de publicarse hacia afuera
+  front:
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
